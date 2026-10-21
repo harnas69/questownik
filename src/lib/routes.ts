@@ -18,12 +18,16 @@ export async function saveRoute(title: string, points: DraftPoint[]) {
     .single()
   if (error) throw error
 
-  const rows = points.map((p, i) => ({
+    const rows = points.map((p, i) => ({
     route_id: route.id,
     position: i,
     lat: p.lat,
     lng: p.lng,
     radius_m: p.radiusM,
+    task_type: p.taskType,
+    content: p.content,
+    score: p.score,
+    hint: p.hint || null,
   }))
   const { error: pointsError } = await supabase.from('points').insert(rows)
   if (pointsError) throw pointsError
