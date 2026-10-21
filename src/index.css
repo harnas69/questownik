@@ -8,3 +8,19 @@ button, input, select, textarea { font-size: 1rem; padding: 8px; }
 .file input { display: none; }
 .file { border: 1px solid #888; border-radius: 4px; padding: 8px; cursor: pointer; }
 @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+
+.play { max-width: 480px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.hud { display: flex; justify-content: space-between; font-weight: 700; }
+.answer { width: 100%; box-sizing: border-box; }
+button.big, a.big { width: 100%; box-sizing: border-box; padding: 16px; font-size: 1.2rem; font-weight: 700; border-radius: 10px; border: 2px solid #1c1c1c; background: #ffd43b; color: #111; cursor: pointer; text-align: center; text-decoration: none; }
+button.big:disabled { opacity: 0.45; cursor: not-allowed; }
+button.big.secondary { background: #fff; }
+.link-btn { display: block; }
+.options { display: flex; flex-direction: column; gap: 10px; }
+.opt { display: flex; gap: 10px; align-items: center; padding: 14px; border: 2px solid #888; border-radius: 10px; font-size: 1.1rem; }
+.opt.sel { border-color: #1c1c1c; background: #fff3bf; color: #111; }
+.prompt { font-size: 1.2rem; }
+.big-score { font-size: 2.4rem; font-weight: 800; margin: 0; }
+.good { color: #2b8a3e; font-weight: 700; font-size: 1.2rem; }
+.bad { color: #c92a2a; font-weight: 700; }
+.note { font-size: 0.9rem; opacity: 0.75; }
