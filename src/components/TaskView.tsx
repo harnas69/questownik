@@ -1,39 +1,52 @@
 import { useState } from 'react'
-import type { GamePoint, PointResult } from '../types/game'
-import { checkAnswer, pointsFor } from '../lib/scoring'
+import type { AnswerResult, GamePoint } from '../types/game'
+import { submitAnswer } from '../lib/sessionApi'
 
 interface Props {
   point: GamePoint
   index: number
   total: number
-  onDone: (result: PointResult) => void
+  sessionId: string
+  onNext: (result: AnswerResult) => void
 }
 
-export default function TaskView({ point, index, total, onDone }: Props) {
+export default function TaskView({ point, index, total, sessionId, onNext }: Props) {
   const [text, setText] = useState('')
   const [choice, setChoice] = useState<number | null>(null)
   const [attempts, setAttempts] = useState(0)
   const [state, setState] = useState<'idle' | 'wrong' | 'right'>('idle')
-  const [earned, setEarned] = useState(0)
+  const [result, setResult] = useState<AnswerResult | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [netError, setNetError] = useState(false)
 
   const isInfo = point.taskType === 'text' || point.taskType === 'photo'
   const isQuiz = point.taskType === 'quiz'
-  const canSubmit = isInfo || (isQuiz ? choice !== null : text.trim() !== '')
+  const canSubmit = !busy && (isInfo || (isQuiz ? choice !== null : text.trim() !== ''))
 
-  const submit = () => {
-    const n = attempts + 1
-    setAttempts(n)
-    const given = isQuiz ? (choice as number) : text
-    if (checkAnswer(point, given)) {
-      setEarned(pointsFor(point.score, n))
-      setState('right')
-    } else {
-      setState('wrong')
+  const send = async (skip: boolean) => {
+    setBusy(true)
+    setNetError(false)
+    try {
+      const given = skip || isInfo ? null : isQuiz ? choice : text
+      const res = await submitAnswer(sessionId, point.id, given, skip)
+      setAttempts(res.attempts)
+      if (skip) {
+        onNext(res)
+        return
+      }
+      if (res.correct) {
+        setResult(res)
+        setState('right')
+      } else {
+        setState('wrong')
+      }
+    } catch (e) {
+      console.error(e)
+      setNetError(true)
+    } finally {
+      setBusy(false)
     }
   }
-
-  const finish = (correct: boolean, pts: number) =>
-    onDone({ pointId: point.id, correct, earned: pts, attempts })
 
   return (
     <section className="task" aria-label={`Zadanie ${index + 1}`}>
@@ -75,6 +88,13 @@ export default function TaskView({ point, index, total, onDone }: Props) {
         />
       )}
 
+      {netError && (
+        <p role="alert" className="bad">
+          Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie. Jeśli problem się
+          powtarza, odśwież stronę (postęp zostanie zachowany).
+        </p>
+      )}
+
       {state === 'wrong' && (
         <p role="alert" className="bad">
           Niepoprawnie, spróbuj jeszcze raz.
@@ -82,20 +102,28 @@ export default function TaskView({ point, index, total, onDone }: Props) {
       )}
       {state === 'wrong' && point.hint && <p>💡 Podpowiedź: {point.hint}</p>}
 
-      {state === 'right' ? (
+      {state === 'right' && result ? (
         <>
-          <p className="good">{isInfo ? 'Zaliczone!' : 'Dobrze!'} +{earned} pkt</p>
-          <button className="big" onClick={() => finish(true, earned)}>
+          <p className="good">
+            {isInfo ? 'Zaliczone!' : 'Dobrze!'} +{result.earned} pkt
+          </p>
+          <button className="big" onClick={() => onNext(result)}>
             Dalej
           </button>
         </>
       ) : (
         <>
-          <button className="big" onClick={submit} disabled={!canSubmit}>
-            {isInfo ? (point.taskType === 'photo' ? 'Zrobiłem zdjęcie' : 'Czytam dalej') : 'Sprawdź'}
+          <button className="big" onClick={() => send(false)} disabled={!canSubmit}>
+            {busy
+              ? 'Sprawdzam…'
+              : isInfo
+                ? point.taskType === 'photo'
+                  ? 'Zrobiłem zdjęcie'
+                  : 'Czytam dalej'
+                : 'Sprawdź'}
           </button>
           {state === 'wrong' && attempts >= 2 && (
-            <button className="big secondary" onClick={() => finish(false, 0)}>
+            <button className="big secondary" onClick={() => send(true)} disabled={busy}>
               Pomiń (0 pkt)
             </button>
           )}

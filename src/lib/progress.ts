@@ -1,12 +1,6 @@
-import type { PointResult } from '../types/game'
-
 export interface SavedProgress {
+  sessionId: string
   team: string
-  idx: number
-  results: PointResult[]
-  startedAt: number
-  finishedAt: number | null
-  sessionId?: string | null
 }
 
 const key = (code: string) => `questownik:${code}`
@@ -14,7 +8,12 @@ const key = (code: string) => `questownik:${code}`
 export function loadProgress(code: string): SavedProgress | null {
   try {
     const raw = localStorage.getItem(key(code))
-    return raw ? (JSON.parse(raw) as SavedProgress) : null
+    if (!raw) return null
+    const p = JSON.parse(raw) as Partial<SavedProgress>
+    if (typeof p.sessionId === 'string' && typeof p.team === 'string') {
+      return { sessionId: p.sessionId, team: p.team }
+    }
+    return null // stary format z poprzednich etapów
   } catch {
     return null
   }

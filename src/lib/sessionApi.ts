@@ -1,18 +1,12 @@
 import { supabase } from './supabase'
 import type { SessionRow } from './ranking'
+import type { AnswerResult, SessionState } from '../types/game'
 
 export interface RouteInfo {
   id: string
   code: string
   title: string
   pointCount: number
-}
-
-export interface SessionPatch {
-  current_idx: number
-  score: number
-  correct_count: number
-  finished_at: string | null
 }
 
 async function ensureSignedIn() {
@@ -24,21 +18,54 @@ async function ensureSignedIn() {
 
 export async function createSession(routeId: string, teamName: string): Promise<string> {
   await ensureSignedIn()
-  const { data, error } = await supabase
-    .from('sessions')
-    .insert({ route_id: routeId, team_name: teamName })
-    .select('id')
-    .single()
+  const { data, error } = await supabase.rpc('start_session', {
+    p_route: routeId,
+    p_team: teamName,
+  })
   if (error) throw error
-  return data.id as string
+  return data as string
 }
 
-export async function updateSession(id: string, patch: SessionPatch) {
-  const { error } = await supabase
-    .from('sessions')
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq('id', id)
+export async function submitAnswer(
+  sessionId: string,
+  pointId: string,
+  given: string | number | null,
+  skip = false
+): Promise<AnswerResult> {
+  const { data, error } = await supabase.rpc('submit_answer', {
+    p_session: sessionId,
+    p_point: pointId,
+    p_given: given ?? undefined,
+    p_skip: skip,
+  })
   if (error) throw error
+  return {
+    correct: data.correct,
+    earned: data.earned,
+    attempts: data.attempts,
+    currentIdx: data.current_idx,
+    score: data.score,
+    correctCount: data.correct_count,
+    finishedAt: data.finished_at,
+  }
+}
+
+export async function fetchSessionState(id: string): Promise<SessionState | null> {
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('team_name, current_idx, score, correct_count, started_at, finished_at')
+    .eq('id', id)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    teamName: data.team_name,
+    currentIdx: data.current_idx,
+    score: data.score,
+    correctCount: data.correct_count,
+    startedAt: data.started_at,
+    finishedAt: data.finished_at,
+  }
 }
 
 export async function loadRouteInfo(code: string): Promise<RouteInfo> {

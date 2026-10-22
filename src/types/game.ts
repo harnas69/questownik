@@ -15,12 +15,25 @@ export interface GameRoute {
   id: string
   code: string
   title: string
+  allowManual: boolean
   points: GamePoint[]
 }
 
-export interface PointResult {
-  pointId: string
+export interface AnswerResult {
   correct: boolean
   earned: number
   attempts: number
+  currentIdx: number
+  score: number
+  correctCount: number
+  finishedAt: string | null
+}
+
+export interface SessionState {
+  teamName: string
+  currentIdx: number
+  score: number
+  correctCount: number
+  startedAt: string
+  finishedAt: string | null
 }

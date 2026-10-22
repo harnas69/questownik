@@ -4,7 +4,7 @@ import type { GameRoute } from '../types/game'
 export async function loadRoute(code: string): Promise<GameRoute> {
   const { data: route, error } = await supabase
     .from('routes')
-    .select('id, code, title')
+    .select('id, code, title, allow_manual')
     .eq('code', code)
     .maybeSingle()
   if (error) throw error
@@ -21,6 +21,7 @@ export async function loadRoute(code: string): Promise<GameRoute> {
     id: route.id,
     code: route.code,
     title: route.title,
+    allowManual: Boolean(route.allow_manual),
     points: (pts ?? []).map((p) => ({
       id: p.id,
       lat: p.lat,

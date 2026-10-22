@@ -14,6 +14,7 @@ export default function EditorPage() {
   const [code, setCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [allowManual, setAllowManual] = useState(false)
 
   const add = (lat: number, lng: number) => {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
@@ -42,7 +43,7 @@ export default function EditorPage() {
     try {
       setError(null)
       setSaving(true)
-      setCode(await saveRoute(title, points))
+      setCode(await saveRoute(title, points, allowManual))
     } catch (e) {
       setError('Nie udało się zapisać trasy.')
       console.error(e)
@@ -93,6 +94,17 @@ export default function EditorPage() {
         <label className="file">
           Import JSON
           <input type="file" accept="application/json,.json" onChange={onImport} />
+        </label>
+      </div>
+
+      <div className="row">
+        <label>
+          <input
+            type="checkbox"
+            checked={allowManual}
+            onChange={(e) => setAllowManual(e.target.checked)}
+          />{' '}
+          Tryb awaryjny: pozwól potwierdzić dojście przyciskiem przy słabym GPS
         </label>
       </div>
 

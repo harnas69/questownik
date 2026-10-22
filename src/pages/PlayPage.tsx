@@ -5,8 +5,8 @@ import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
-import { createSession, updateSession } from '../lib/sessionApi'
-import type { GameRoute, PointResult } from '../types/game'
+import { createSession, fetchSessionState } from '../lib/sessionApi'
+import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
 function fmtTime(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -21,60 +21,43 @@ export default function PlayPage() {
   const [route, setRoute] = useState<GameRoute | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [team, setTeam] = useState('')
-  const [started, setStarted] = useState(false)
-  const [idx, setIdx] = useState(0)
-  const [results, setResults] = useState<PointResult[]>([])
-  const [startedAt, setStartedAt] = useState(0)
-  const [finishedAt, setFinishedAt] = useState<number | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [state, setState] = useState<SessionState | null>(null)
+  const [starting, setStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const [pos, setPos] = useState<GeoPos | null>(null)
   const [gpsError, setGpsError] = useState<string | null>(null)
-  const [simulated, setSimulated] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [unlocked, setUnlocked] = useState(false)
 
-  // 1. Pobierz trasę i ewentualnie przywróć postęp
+  const started = sessionId !== null && state !== null
+
+  // 1. Pobierz trasę i odtwórz postęp z serwera
   useEffect(() => {
     let cancelled = false
-    loadRoute(code.toUpperCase())
-      .then((r) => {
+    ;(async () => {
+      const r = await loadRoute(code.toUpperCase())
+      const saved = loadProgress(r.code)
+      if (saved) {
+        const s = await fetchSessionState(saved.sessionId)
         if (cancelled) return
-        setRoute(r)
-        const saved = loadProgress(r.code)
-        if (saved) {
-          setTeam(saved.team)
-          setIdx(saved.idx)
-          setResults(saved.results)
-          setStartedAt(saved.startedAt)
-          setFinishedAt(saved.finishedAt)
-          setSessionId(saved.sessionId ?? null)
-          setStarted(true)
+        if (s) {
+          setTeam(s.teamName)
+          setSessionId(saved.sessionId)
+          setState(s)
+        } else {
+          clearProgress(r.code)
         }
-      })
-      .catch((e) => {
-        if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Nie udało się wczytać trasy.')
-      })
+      }
+      if (!cancelled) setRoute(r)
+    })().catch((e) => {
+      if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Nie udało się wczytać trasy.')
+    })
     return () => {
       cancelled = true
     }
   }, [code])
 
-  // 2. Zapisuj postęp lokalnie
-  useEffect(() => {
-    if (!route || !started) return
-    saveProgress(route.code, { team, idx, results, startedAt, finishedAt, sessionId })
-  }, [route, started, team, idx, results, startedAt, finishedAt, sessionId])
-
-  // 2b. Wysyłaj postęp do bazy (wartości bezwzględne, więc pomyłka sama się naprawi)
-  useEffect(() => {
-    if (!sessionId) return
-    updateSession(sessionId, {
-      current_idx: idx,
-      score: results.reduce((sum, r) => sum + r.earned, 0),
-      correct_count: results.filter((r) => r.correct).length,
-      finished_at: finishedAt ? new Date(finishedAt).toISOString() : null,
-    }).catch((e) => console.error(e))
-  }, [sessionId, idx, results, finishedAt])
-
-  // 3. Śledź pozycję GPS
+  // 2. Śledź pozycję GPS
   useEffect(() => {
     if (!started) return
     if (!navigator.geolocation) {
@@ -112,7 +95,6 @@ export default function PlayPage() {
       </main>
     )
   }
-
   if (route.points.length === 0) {
     return (
       <main className="play">
@@ -123,7 +105,26 @@ export default function PlayPage() {
   }
 
   // Ekran startowy
-  if (!started) {
+  if (!started || !sessionId || !state) {
+    const start = async () => {
+      setStarting(true)
+      setStartError(null)
+      try {
+        const name = team.trim()
+        const id = await createSession(route.id, name)
+        const s = await fetchSessionState(id)
+        if (!s) throw new Error('Nie znaleziono utworzonej sesji.')
+        saveProgress(route.code, { sessionId: id, team: name })
+        setSessionId(id)
+        setState(s)
+      } catch (e) {
+        console.error(e)
+        setStartError('Nie udało się rozpocząć gry. Sprawdź internet i spróbuj ponownie.')
+      } finally {
+        setStarting(false)
+      }
+    }
+
     return (
       <main className="play">
         <h1>{route.title}</h1>
@@ -136,28 +137,25 @@ export default function PlayPage() {
           onChange={(e) => setTeam(e.target.value)}
         />
         <p className="note">Nie podawaj imion i nazwisk, wystarczy nazwa drużyny.</p>
-        <button
-          className="big"
-          disabled={!team.trim()}
-          onClick={() => {
-            setStartedAt(Date.now())
-            setStarted(true)
-            createSession(route.id, team.trim())
-              .then(setSessionId)
-              .catch((e) => console.error(e)) // gra działa dalej, nawet bez rankingu
-          }}
-        >
-          Start
+        {startError && (
+          <p role="alert" className="bad">
+            {startError}
+          </p>
+        )}
+        <button className="big" disabled={!team.trim() || starting} onClick={start}>
+          {starting ? 'Startuję…' : 'Start'}
         </button>
       </main>
     )
   }
 
-  const total = route.points.reduce((sum, r) => sum + r.score, 0)
-  const score = results.reduce((sum, r) => sum + r.earned, 0)
+  const total = route.points.reduce((sum, p) => sum + p.score, 0)
 
   // Ekran końcowy
-  if (idx >= route.points.length) {
+  if (state.currentIdx >= route.points.length) {
+    const duration = state.finishedAt
+      ? fmtTime(Date.parse(state.finishedAt) - Date.parse(state.startedAt))
+      : '—'
     return (
       <main className="play">
         <h1>Koniec trasy!</h1>
@@ -165,11 +163,11 @@ export default function PlayPage() {
           Drużyna: <strong>{team}</strong>
         </p>
         <p className="big-score">
-          {score} / {total} pkt
+          {state.score} / {total} pkt
         </p>
-        <p>Czas: {fmtTime((finishedAt ?? Date.now()) - startedAt)}</p>
+        <p>Czas: {duration}</p>
         <p>
-          Poprawne odpowiedzi: {results.filter((r) => r.correct).length} z {route.points.length}
+          Poprawne odpowiedzi: {state.correctCount} z {route.points.length}
         </p>
         <button
           className="big secondary"
@@ -185,36 +183,53 @@ export default function PlayPage() {
     )
   }
 
-  const point = route.points[idx]
+  const point = route.points[state.currentIdx]
   const dist = pos ? distanceM(pos.lat, pos.lng, point.lat, point.lng) : null
-  const inRange = simulated || (pos !== null && isInRange(pos, point))
+  const inRange = unlocked || (pos !== null && isInRange(pos, point))
 
-  const onDone = (r: PointResult) => {
-    setResults((prev) => [...prev, r])
-    setSimulated(false)
-    if (idx + 1 >= route.points.length) setFinishedAt(Date.now())
-    setIdx(idx + 1)
+  // Tryb awaryjny (włącza nauczyciel): przycisk tylko gdy GPS zawodzi albo jesteś blisko
+  const manualAllowed =
+    route.allowManual &&
+    (gpsError !== null ||
+      dist === null ||
+      dist <= 150 ||
+      (pos !== null && pos.accuracy > 50))
+
+  const onNext = (r: AnswerResult) => {
+    setUnlocked(false)
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            currentIdx: r.currentIdx,
+            score: r.score,
+            correctCount: r.correctCount,
+            finishedAt: r.finishedAt,
+          }
+        : prev
+    )
   }
 
   return (
     <main className="play">
       <header className="hud">
         <span>{team}</span>
-        <span>{score} pkt</span>
+        <span>{state.score} pkt</span>
       </header>
 
       {inRange ? (
         <TaskView
           key={point.id}
           point={point}
-          index={idx}
+          index={state.currentIdx}
           total={route.points.length}
-          onDone={onDone}
+          sessionId={sessionId}
+          onNext={onNext}
         />
       ) : (
         <section>
           <h2>
-            Idź do punktu {idx + 1} z {route.points.length}
+            Idź do punktu {state.currentIdx + 1} z {route.points.length}
           </h2>
           {gpsError && (
             <p role="alert" className="bad">
@@ -237,8 +252,13 @@ export default function PlayPage() {
           >
             Nawiguj w Mapach Google
           </a>
+          {manualAllowed && (
+            <button className="big secondary" onClick={() => setUnlocked(true)}>
+              Jestem na miejscu
+            </button>
+          )}
           {debug && (
-            <button className="big secondary" onClick={() => setSimulated(true)}>
+            <button className="big secondary" onClick={() => setUnlocked(true)}>
               [debug] Symuluj dojście
             </button>
           )}
