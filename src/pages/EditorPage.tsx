@@ -84,7 +84,12 @@ export default function EditorPage() {
       <h1>Questownik – edytor tras</h1>
 
       <div className="row">
-        <input placeholder="Tytuł trasy" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input
+          aria-label="Tytuł trasy"
+          placeholder="Tytuł trasy"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
         <button onClick={save} disabled={!title.trim() || points.length === 0 || saving}>
           {saving ? 'Zapisuję…' : `Zapisz trasę (${points.length} pkt)`}
         </button>

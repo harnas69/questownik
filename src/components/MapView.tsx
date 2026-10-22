@@ -30,6 +30,7 @@ export default function MapView({ points, selected, onAdd, onSelect, onMove }: P
   return (
     <MapContainer center={[51.7611, 18.091]} zoom={15} style={{ height: '70vh', width: '100%' }}>
       <TileLayer
+        crossOrigin
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />

@@ -15,6 +15,7 @@ export default function HomePage() {
       <p>Miejska gra terenowa. Wpisz kod trasy od nauczyciela.</p>
       <input
         className="answer"
+        aria-label="Kod trasy"
         placeholder="Kod trasy (np. 74C2TF)"
         value={code}
         maxLength={6}

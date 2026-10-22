@@ -60,7 +60,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       )}
 
       {isQuiz && state !== 'right' && (
-        <div role="radiogroup" className="options">
+        <div role="radiogroup" aria-label="Odpowiedzi" className="options">
           {point.content.options?.map((opt, i) => (
             <label key={i} className={choice === i ? 'opt sel' : 'opt'}>
               <input
@@ -80,6 +80,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       {(point.taskType === 'open' || point.taskType === 'code') && state !== 'right' && (
         <input
           className="answer"
+          aria-label="Twoja odpowiedź"
           placeholder={point.taskType === 'code' ? 'Wpisz kod' : 'Twoja odpowiedź'}
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -104,7 +105,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
 
       {state === 'right' && result ? (
         <>
-          <p className="good">
+          <p className="good" role="status">
             {isInfo ? 'Zaliczone!' : 'Dobrze!'} +{result.earned} pkt
           </p>
           <button className="big" onClick={() => onNext(result)}>

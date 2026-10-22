@@ -28,3 +28,17 @@ button.big.secondary { background: #fff; }
 .ranking { max-width: 720px; margin: 0 auto; padding: 16px; }
 .ranking table { width: 100%; border-collapse: collapse; font-size: 1.1rem; }
 .ranking th, .ranking td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #8884; }
+
+:root { color-scheme: light; color: #111; background: #fff; }
+.note { opacity: 1; color: #495057; }
+
+:focus-visible { outline: 3px solid #1c7ed6; outline-offset: 2px; }
+button, a.big, .opt, input, select, textarea { min-height: 44px; }
+
+.offline { position: sticky; top: 0; z-index: 1000; background: #c92a2a; color: #fff; padding: 10px 14px; font-weight: 700; text-align: center; }
+
+.play { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

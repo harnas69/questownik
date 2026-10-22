@@ -6,6 +6,7 @@ import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { createSession, fetchSessionState } from '../lib/sessionApi'
+import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
 function fmtTime(ms: number): string {
@@ -30,6 +31,8 @@ export default function PlayPage() {
   const [unlocked, setUnlocked] = useState(false)
 
   const started = sessionId !== null && state !== null
+
+  useWakeLock(started)
 
   // 1. Pobierz trasę i odtwórz postęp z serwera
   useEffect(() => {
@@ -131,6 +134,7 @@ export default function PlayPage() {
         <p>{route.points.length} punktów do odwiedzenia. Gra korzysta z Twojej lokalizacji.</p>
         <input
           className="answer"
+          aria-label="Nazwa drużyny"
           placeholder="Nazwa drużyny"
           maxLength={30}
           value={team}

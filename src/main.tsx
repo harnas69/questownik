@@ -5,11 +5,13 @@ import HomePage from './pages/HomePage'
 import EditorPage from './pages/EditorPage'
 import PlayPage from './pages/PlayPage'
 import RankingPage from './pages/RankingPage'
+import OfflineBanner from './components/OfflineBanner'
 import './index.css'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
+      <OfflineBanner />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/edytor" element={<EditorPage />} />
@@ -19,3 +21,10 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>
 )
+
+// Service worker tylko w wersji produkcyjnej (na localhost w trybie dev by przeszkadzał)
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((e) => console.error('SW:', e))
+  })
+}
