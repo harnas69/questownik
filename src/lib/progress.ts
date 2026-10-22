@@ -6,6 +6,7 @@ export interface SavedProgress {
   results: PointResult[]
   startedAt: number
   finishedAt: number | null
+  sessionId?: string | null
 }
 
 const key = (code: string) => `questownik:${code}`
@@ -15,7 +16,7 @@ export function loadProgress(code: string): SavedProgress | null {
     const raw = localStorage.getItem(key(code))
     return raw ? (JSON.parse(raw) as SavedProgress) : null
   } catch {
-    return null // brak dostępu do localStorage nie może zepsuć gry
+    return null
   }
 }
 

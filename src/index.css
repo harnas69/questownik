@@ -24,3 +24,7 @@ button.big.secondary { background: #fff; }
 .good { color: #2b8a3e; font-weight: 700; font-size: 1.2rem; }
 .bad { color: #c92a2a; font-weight: 700; }
 .note { font-size: 0.9rem; opacity: 0.75; }
+
+.ranking { max-width: 720px; margin: 0 auto; padding: 16px; }
+.ranking table { width: 100%; border-collapse: collapse; font-size: 1.1rem; }
+.ranking th, .ranking td { text-align: left; padding: 10px 8px; border-bottom: 1px solid #8884; }

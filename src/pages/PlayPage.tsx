@@ -5,6 +5,7 @@ import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
+import { createSession, updateSession } from '../lib/sessionApi'
 import type { GameRoute, PointResult } from '../types/game'
 
 function fmtTime(ms: number): string {
@@ -28,6 +29,7 @@ export default function PlayPage() {
   const [pos, setPos] = useState<GeoPos | null>(null)
   const [gpsError, setGpsError] = useState<string | null>(null)
   const [simulated, setSimulated] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(null)
 
   // 1. Pobierz trasę i ewentualnie przywróć postęp
   useEffect(() => {
@@ -43,6 +45,7 @@ export default function PlayPage() {
           setResults(saved.results)
           setStartedAt(saved.startedAt)
           setFinishedAt(saved.finishedAt)
+          setSessionId(saved.sessionId ?? null)
           setStarted(true)
         }
       })
@@ -54,11 +57,22 @@ export default function PlayPage() {
     }
   }, [code])
 
-  // 2. Zapisuj postęp
+  // 2. Zapisuj postęp lokalnie
   useEffect(() => {
     if (!route || !started) return
-    saveProgress(route.code, { team, idx, results, startedAt, finishedAt })
-  }, [route, started, team, idx, results, startedAt, finishedAt])
+    saveProgress(route.code, { team, idx, results, startedAt, finishedAt, sessionId })
+  }, [route, started, team, idx, results, startedAt, finishedAt, sessionId])
+
+  // 2b. Wysyłaj postęp do bazy (wartości bezwzględne, więc pomyłka sama się naprawi)
+  useEffect(() => {
+    if (!sessionId) return
+    updateSession(sessionId, {
+      current_idx: idx,
+      score: results.reduce((sum, r) => sum + r.earned, 0),
+      correct_count: results.filter((r) => r.correct).length,
+      finished_at: finishedAt ? new Date(finishedAt).toISOString() : null,
+    }).catch((e) => console.error(e))
+  }, [sessionId, idx, results, finishedAt])
 
   // 3. Śledź pozycję GPS
   useEffect(() => {
@@ -91,10 +105,21 @@ export default function PlayPage() {
       </main>
     )
   }
-  if (!route) return <main className="play"><p>Wczytuję trasę…</p></main>
+  if (!route) {
+    return (
+      <main className="play">
+        <p>Wczytuję trasę…</p>
+      </main>
+    )
+  }
 
   if (route.points.length === 0) {
-    return <main className="play"><p>Ta trasa nie ma punktów.</p><Link to="/">Wróć</Link></main>
+    return (
+      <main className="play">
+        <p>Ta trasa nie ma punktów.</p>
+        <Link to="/">Wróć</Link>
+      </main>
+    )
   }
 
   // Ekran startowy
@@ -117,6 +142,9 @@ export default function PlayPage() {
           onClick={() => {
             setStartedAt(Date.now())
             setStarted(true)
+            createSession(route.id, team.trim())
+              .then(setSessionId)
+              .catch((e) => console.error(e)) // gra działa dalej, nawet bez rankingu
           }}
         >
           Start
@@ -133,10 +161,16 @@ export default function PlayPage() {
     return (
       <main className="play">
         <h1>Koniec trasy!</h1>
-        <p>Drużyna: <strong>{team}</strong></p>
-        <p className="big-score">{score} / {total} pkt</p>
+        <p>
+          Drużyna: <strong>{team}</strong>
+        </p>
+        <p className="big-score">
+          {score} / {total} pkt
+        </p>
         <p>Czas: {fmtTime((finishedAt ?? Date.now()) - startedAt)}</p>
-        <p>Poprawne odpowiedzi: {results.filter((r) => r.correct).length} z {route.points.length}</p>
+        <p>
+          Poprawne odpowiedzi: {results.filter((r) => r.correct).length} z {route.points.length}
+        </p>
         <button
           className="big secondary"
           onClick={() => {
@@ -170,16 +204,31 @@ export default function PlayPage() {
       </header>
 
       {inRange ? (
-        <TaskView key={point.id} point={point} index={idx} total={route.points.length} onDone={onDone} />
+        <TaskView
+          key={point.id}
+          point={point}
+          index={idx}
+          total={route.points.length}
+          onDone={onDone}
+        />
       ) : (
         <section>
-          <h2>Idź do punktu {idx + 1} z {route.points.length}</h2>
-          {gpsError && <p role="alert" className="bad">{gpsError}</p>}
-          {!gpsError && dist === null && <p>Szukam Twojej pozycji…</p>}
-          {dist !== null && (
-            <p className="big-score">{Math.round(dist)} m</p>
+          <h2>
+            Idź do punktu {idx + 1} z {route.points.length}
+          </h2>
+          {gpsError && (
+            <p role="alert" className="bad">
+              {gpsError}
+            </p>
           )}
-          {pos && <p className="note">Dokładność GPS: ±{Math.round(pos.accuracy)} m. Zadanie odblokuje się w promieniu {point.radiusM} m.</p>}
+          {!gpsError && dist === null && <p>Szukam Twojej pozycji…</p>}
+          {dist !== null && <p className="big-score">{Math.round(dist)} m</p>}
+          {pos && (
+            <p className="note">
+              Dokładność GPS: ±{Math.round(pos.accuracy)} m. Zadanie odblokuje się w promieniu{' '}
+              {point.radiusM} m.
+            </p>
+          )}
           <a
             className="big link-btn"
             href={`https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=walking`}

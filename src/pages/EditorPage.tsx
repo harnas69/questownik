@@ -97,9 +97,17 @@ export default function EditorPage() {
       </div>
 
       {code && (
-        <p>
-          Kod trasy: <strong>{code}</strong>
-        </p>
+        <>
+          <p>
+            Kod trasy: <strong>{code}</strong>
+          </p>
+          <p>
+            Gra: <a href={`/gra/${code}`}>/gra/{code}</a>
+          </p>
+          <p>
+            Ranking na żywo: <a href={`/ranking/${code}`}>/ranking/{code}</a>
+          </p>
+        </>
       )}
       {error && <p role="alert">{error}</p>}
 
