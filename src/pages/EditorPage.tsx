@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import type { Map as LeafletMap } from 'leaflet'
 import MapView from '../components/MapView'
 import PointForm from '../components/PointForm'
+import PointList from '../components/PointList'
+import SharePanel from '../components/SharePanel'
 import { saveRoute } from '../lib/routes'
 import { moveItem, newPoint, validatePoints } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
@@ -14,15 +17,65 @@ export default function EditorPage() {
   const [code, setCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [locating, setLocating] = useState(false)
   const [allowManual, setAllowManual] = useState(false)
+
+  const mapRef = useRef<LeafletMap | null>(null)
+  const countRef = useRef(0)
+
+  useEffect(() => {
+    countRef.current = points.length
+  }, [points.length])
+
+  // Ostrzeżenie przed zamknięciem karty z niezapisanymi punktami
+  useEffect(() => {
+    if (points.length === 0 || code) return
+    const handler = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [points.length, code])
 
   const add = (lat: number, lng: number) => {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
-    setSelected(points.length)
+    setSelected(countRef.current)
+    countRef.current += 1
+  }
+
+  const addAtCenter = () => {
+    const c = mapRef.current?.getCenter()
+    if (c) add(c.lat, c.lng)
+  }
+
+  const addHere = () => {
+    if (!navigator.geolocation) {
+      setError('Ta przeglądarka nie obsługuje geolokalizacji.')
+      return
+    }
+    setLocating(true)
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setLocating(false)
+        setError(null)
+        const { latitude, longitude } = p.coords
+        add(latitude, longitude)
+        const map = mapRef.current
+        if (map) map.setView([latitude, longitude], Math.max(map.getZoom(), 17))
+      },
+      () => {
+        setLocating(false)
+        setError('Nie udało się ustalić lokalizacji. Zezwól na dostęp do lokalizacji i spróbuj ponownie.')
+      },
+      { enableHighAccuracy: true, timeout: 15000 }
+    )
   }
 
   const patchPoint = (i: number, patch: Partial<DraftPoint>) =>
     setPoints((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)))
+
+  const moveSelectedToCenter = () => {
+    const c = mapRef.current?.getCenter()
+    if (c && selected !== null) patchPoint(selected, { lat: c.lat, lng: c.lng })
+  }
 
   const move = (i: number, to: number) => {
     setPoints((prev) => moveItem(prev, i, to))
@@ -32,6 +85,15 @@ export default function EditorPage() {
   const remove = (i: number) => {
     setPoints((prev) => prev.filter((_, j) => j !== i))
     setSelected(null)
+  }
+
+  const reset = () => {
+    setTitle('')
+    setPoints([])
+    setSelected(null)
+    setCode(null)
+    setError(null)
+    setAllowManual(false)
   }
 
   const save = async () => {
@@ -81,7 +143,7 @@ export default function EditorPage() {
 
   return (
     <main className="editor">
-      <h1>Questownik – edytor tras</h1>
+      <h1>Edytor tras</h1>
 
       <div className="row">
         <input
@@ -113,30 +175,41 @@ export default function EditorPage() {
         </label>
       </div>
 
-      {code && (
-        <>
-          <p>
-            Kod trasy: <strong>{code}</strong>
-          </p>
-          <p>
-            Gra: <a href={`/gra/${code}`}>/gra/{code}</a>
-          </p>
-          <p>
-            Ranking na żywo: <a href={`/ranking/${code}`}>/ranking/{code}</a>
-          </p>
-        </>
+      {error && (
+        <p role="alert" className="bad">
+          {error}
+        </p>
       )}
-      {error && <p role="alert">{error}</p>}
+
+      {code && <SharePanel code={code} onReset={reset} />}
+
+      <div className="toolbar" role="group" aria-label="Dodawanie i przesuwanie punktów">
+        <button type="button" onClick={addAtCenter}>
+          Dodaj punkt na środku mapy
+        </button>
+        <button type="button" onClick={addHere} disabled={locating}>
+          {locating ? 'Szukam lokalizacji…' : 'Dodaj punkt w mojej lokalizacji'}
+        </button>
+        <button type="button" onClick={moveSelectedToCenter} disabled={selected === null}>
+          Przesuń wybrany punkt na środek mapy
+        </button>
+      </div>
+      <p className="note">
+        Wskazówka: mapę przesuwasz strzałkami, a zbliżenie zmieniasz klawiszami + i −. Punkt
+        możesz też dodać kliknięciem w mapę albo przeciągnąć marker.
+      </p>
 
       <div className="layout">
         <MapView
           points={points}
           selected={selected}
+          mapRef={mapRef}
           onAdd={add}
           onSelect={setSelected}
           onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
         />
         <aside>
+          <PointList points={points} selected={selected} onSelect={setSelected} />
           {selected !== null && points[selected] ? (
             <PointForm
               point={points[selected]}
@@ -148,7 +221,7 @@ export default function EditorPage() {
               onDelete={() => remove(selected)}
             />
           ) : (
-            <p>Kliknij na mapie, aby dodać punkt, albo wybierz istniejący marker.</p>
+            points.length > 0 && <p className="note">Wybierz punkt z listy lub z mapy, aby go edytować.</p>
           )}
         </aside>
       </div>

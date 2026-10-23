@@ -217,3 +217,33 @@ button.big:disabled {
 }
 input[type="checkbox"] { border-color: var(--text); }
 .editor .row input:not([type="checkbox"]):not([type="file"]) { flex: 1 1 220px; }
+
+/* Edytor: lista punktów, narzędzia, udostępnianie */
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+.point-list {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 240px; overflow-y: auto;
+}
+.pl-item {
+  display: flex; width: 100%; gap: 10px; align-items: center; text-align: left;
+  font-weight: 400; border-color: var(--border); border-radius: 12px; padding: 8px 10px;
+}
+.pl-item.sel { border-color: var(--text); background: var(--surface-2); }
+.pl-num {
+  flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%;
+  background: var(--primary); color: var(--on-primary);
+  display: grid; place-items: center; font-weight: 800;
+}
+.pl-body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pl-type { font-size: 0.8rem; color: var(--muted); }
+.pl-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pl-warn { color: var(--bad); font-weight: 800; font-size: 1.2rem; }
+
+.share { margin: 12px 0; max-width: 640px; }
+.share-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.share-row a { word-break: break-all; }
+.route-code { font-size: 1.6rem; letter-spacing: 0.15em; }
+.share-qr { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.qr { width: min(260px, 100%); height: auto; border-radius: 8px; background: #fff; }
+.copy-status { font-size: 0.9rem; color: var(--good); min-height: 1.2em; }

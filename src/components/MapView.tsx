@@ -1,6 +1,8 @@
-import { Fragment } from 'react'
-import { MapContainer, TileLayer, Marker, Circle, Tooltip, useMapEvents } from 'react-leaflet'
+import { Fragment, useEffect } from 'react'
+import type { RefObject } from 'react'
+import { MapContainer, TileLayer, Marker, Circle, Tooltip, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import type { Map as LeafletMap } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import icon from 'leaflet/dist/images/marker-icon.png'
 import icon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -17,6 +19,7 @@ L.Icon.Default.mergeOptions({
 interface Props {
   points: DraftPoint[]
   selected: number | null
+  mapRef: RefObject<LeafletMap | null>
   onAdd: (lat: number, lng: number) => void
   onSelect: (index: number) => void
   onMove: (index: number, lat: number, lng: number) => void
@@ -27,11 +30,31 @@ function ClickHandler({ onAdd }: { onAdd: Props['onAdd'] }) {
   return null
 }
 
-export default function MapView({ points, selected, onAdd, onSelect, onMove }: Props) {
+// Gdy wybrany punkt jest poza widokiem (np. wybrany z listy), przesuwamy mapę do niego
+function FocusSelected({ point }: { point: DraftPoint | null }) {
+  const map = useMap()
+  const lat = point?.lat
+  const lng = point?.lng
+  useEffect(() => {
+    if (lat === undefined || lng === undefined) return
+    if (!map.getBounds().contains([lat, lng])) map.panTo([lat, lng])
+  }, [map, lat, lng])
+  return null
+}
+
+export default function MapView({ points, selected, mapRef, onAdd, onSelect, onMove }: Props) {
+  const selectedPoint = selected !== null ? (points[selected] ?? null) : null
+
   return (
-    <MapContainer center={[51.7611, 18.091]} zoom={15} style={{ height: '70vh', width: '100%' }}>
+    <MapContainer
+      ref={mapRef}
+      center={[51.7611, 18.091]}
+      zoom={15}
+      style={{ height: '70vh', width: '100%' }}
+    >
       <TileLayer crossOrigin attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       <ClickHandler onAdd={onAdd} />
+      <FocusSelected point={selectedPoint} />
       {points.map((p, i) => (
         <Fragment key={i}>
           <Marker
