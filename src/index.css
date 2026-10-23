@@ -247,3 +247,44 @@ input[type="checkbox"] { border-color: var(--text); }
 .share-qr { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .qr { width: min(260px, 100%); height: auto; border-radius: 8px; background: #fff; }
 .copy-status { font-size: 0.9rem; color: var(--good); min-height: 1.2em; }
+
+/* Poprawki edytora na telefonie */
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  width: 1.6rem;
+  height: 1.6rem;
+  border: 2px solid var(--text);
+  border-radius: 6px;
+  background: var(--surface);
+}
+input[type="checkbox"]:checked { background: var(--primary); border-color: var(--on-primary); }
+input[type="checkbox"]:checked::after {
+  content: "✓";
+  color: var(--on-primary);
+  font-weight: 800;
+  line-height: 1;
+}
+.editor label:has(input[type="checkbox"]) {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.toolbar button,
+.editor .row > button,
+.editor .row > .file {
+  flex: 1 1 200px;
+  text-align: center;
+}
+
+.share-row > span { flex: 1 1 100%; }
+.share-row a { font-size: 0.9rem; overflow-wrap: anywhere; word-break: normal; }
+
+@media (max-width: 800px) {
+  .layout .leaflet-container { height: 45vh !important; min-height: 280px; }
+}
