@@ -5,6 +5,8 @@ import type { RouteInfo } from '../lib/sessionApi'
 import { durationMs, sortRanking } from '../lib/ranking'
 import type { SessionRow } from '../lib/ranking'
 
+const MEDALS = ['🥇', '🥈', '🥉']
+
 function fmt(ms: number): string {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -15,6 +17,7 @@ export default function RankingPage() {
   const [info, setInfo] = useState<RouteInfo | null>(null)
   const [rows, setRows] = useState<SessionRow[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [projector, setProjector] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -50,45 +53,67 @@ export default function RankingPage() {
   if (error) {
     return (
       <main className="play">
-        <p role="alert">{error}</p>
+        <p role="alert" className="bad">
+          {error}
+        </p>
         <Link to="/">Strona główna</Link>
       </main>
     )
   }
-  if (!info) return <main className="play"><p>Wczytuję ranking…</p></main>
+  if (!info) {
+    return (
+      <main className="play">
+        <p role="status">Wczytuję ranking…</p>
+      </main>
+    )
+  }
 
   return (
-    <main className="ranking">
+    <main className={projector ? 'ranking projector' : 'ranking'}>
       <h1>Ranking: {info.title}</h1>
       <p className="note">Kod trasy: {info.code}. Ranking odświeża się na żywo.</p>
+      <div className="row">
+        <button type="button" aria-pressed={projector} onClick={() => setProjector((v) => !v)}>
+          Tryb projektora (większe litery)
+        </button>
+      </div>
+
       {rows.length === 0 ? (
         <p>Żadna drużyna jeszcze nie wystartowała.</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Drużyna</th>
-              <th>Postęp</th>
-              <th>Punkty</th>
-              <th>Czas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              const d = durationMs(r)
-              return (
-                <tr key={r.id}>
-                  <td>{i + 1}</td>
-                  <td>{r.team_name}</td>
-                  <td>{Math.min(r.current_idx, info.pointCount)}/{info.pointCount}</td>
-                  <td>{r.score}</td>
-                  <td>{d !== null ? fmt(d) : 'w grze'}</td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <div className="table-wrap">
+          <table>
+            <caption className="sr-only">Ranking drużyn trasy {info.title}</caption>
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Drużyna</th>
+                <th scope="col">Postęp</th>
+                <th scope="col">Punkty</th>
+                <th scope="col">Czas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const d = durationMs(r)
+                return (
+                  <tr key={r.id} className={i < 3 && r.score > 0 ? 'top' : undefined}>
+                    <td>
+                      <span aria-hidden="true">{i < 3 && r.score > 0 ? `${MEDALS[i]} ` : ''}</span>
+                      {i + 1}
+                    </td>
+                    <td>{r.team_name}</td>
+                    <td>
+                      {Math.min(r.current_idx, info.pointCount)}/{info.pointCount}
+                    </td>
+                    <td>{r.score}</td>
+                    <td>{d !== null ? fmt(d) : 'w grze'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </main>
   )

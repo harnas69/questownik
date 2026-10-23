@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AnswerResult, GamePoint } from '../types/game'
 import { submitAnswer } from '../lib/sessionApi'
+import FocusHeading from './FocusHeading'
 
 interface Props {
   point: GamePoint
@@ -18,6 +19,12 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [netError, setNetError] = useState(false)
+  const nextRef = useRef<HTMLButtonElement>(null)
+
+  // Po dobrej odpowiedzi przycisk "Sprawdź" znika, więc przenosimy fokus na "Dalej"
+  useEffect(() => {
+    if (state === 'right') nextRef.current?.focus()
+  }, [state])
 
   const isInfo = point.taskType === 'text' || point.taskType === 'photo'
   const isQuiz = point.taskType === 'quiz'
@@ -49,10 +56,10 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
   }
 
   return (
-    <section className="task" aria-label={`Zadanie ${index + 1}`}>
-      <h2>
+    <section className="card" aria-label={`Zadanie ${index + 1}`}>
+      <FocusHeading>
         Zadanie {index + 1} z {total}
-      </h2>
+      </FocusHeading>
       <p className="prompt">{point.content.prompt || 'Jesteś na miejscu!'}</p>
 
       {point.taskType === 'photo' && (
@@ -60,7 +67,8 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       )}
 
       {isQuiz && state !== 'right' && (
-        <div role="radiogroup" aria-label="Odpowiedzi" className="options">
+        <fieldset className="options">
+          <legend className="sr-only">Wybierz odpowiedź</legend>
           {point.content.options?.map((opt, i) => (
             <label key={i} className={choice === i ? 'opt sel' : 'opt'}>
               <input
@@ -74,7 +82,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
               </span>
             </label>
           ))}
-        </div>
+        </fieldset>
       )}
 
       {(point.taskType === 'open' || point.taskType === 'code') && state !== 'right' && (
@@ -98,7 +106,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
 
       {state === 'wrong' && (
         <p role="alert" className="bad">
-          Niepoprawnie, spróbuj jeszcze raz.
+          <span aria-hidden="true">✗ </span>Niepoprawnie, spróbuj jeszcze raz.
         </p>
       )}
       {state === 'wrong' && point.hint && <p>💡 Podpowiedź: {point.hint}</p>}
@@ -106,9 +114,10 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       {state === 'right' && result ? (
         <>
           <p className="good" role="status">
+            <span aria-hidden="true">✓ </span>
             {isInfo ? 'Zaliczone!' : 'Dobrze!'} +{result.earned} pkt
           </p>
-          <button className="big" onClick={() => onNext(result)}>
+          <button ref={nextRef} className="big" onClick={() => onNext(result)}>
             Dalej
           </button>
         </>

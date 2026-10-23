@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import FocusHeading from '../components/FocusHeading'
+import ProgressBar from '../components/ProgressBar'
 import TaskView from '../components/TaskView'
 import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
+import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
 import { createSession, fetchSessionState } from '../lib/sessionApi'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
@@ -12,6 +15,11 @@ import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 function fmtTime(ms: number): string {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
+}
+
+function fmtDist(m: number): { value: string; unit: string } {
+  if (m < 1000) return { value: String(Math.round(m)), unit: 'm' }
+  return { value: (m / 1000).toFixed(1).replace('.', ','), unit: 'km' }
 }
 
 export default function PlayPage() {
@@ -86,7 +94,9 @@ export default function PlayPage() {
   if (loadError) {
     return (
       <main className="play">
-        <p role="alert">{loadError}</p>
+        <p role="alert" className="bad">
+          {loadError}
+        </p>
         <Link to="/">Wróć na stronę główną</Link>
       </main>
     )
@@ -94,7 +104,7 @@ export default function PlayPage() {
   if (!route) {
     return (
       <main className="play">
-        <p>Wczytuję trasę…</p>
+        <p role="status">Wczytuję trasę…</p>
       </main>
     )
   }
@@ -130,25 +140,41 @@ export default function PlayPage() {
 
     return (
       <main className="play">
-        <h1>{route.title}</h1>
-        <p>{route.points.length} punktów do odwiedzenia. Gra korzysta z Twojej lokalizacji.</p>
-        <input
-          className="answer"
-          aria-label="Nazwa drużyny"
-          placeholder="Nazwa drużyny"
-          maxLength={30}
-          value={team}
-          onChange={(e) => setTeam(e.target.value)}
-        />
-        <p className="note">Nie podawaj imion i nazwisk, wystarczy nazwa drużyny.</p>
-        {startError && (
-          <p role="alert" className="bad">
-            {startError}
+        <div className="hero">
+          <h1>{route.title}</h1>
+          <p className="lead">
+            {route.points.length} punktów do odwiedzenia. Gra korzysta z Twojej lokalizacji.
           </p>
-        )}
-        <button className="big" disabled={!team.trim() || starting} onClick={start}>
-          {starting ? 'Startuję…' : 'Start'}
-        </button>
+        </div>
+        <form
+          className="card"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (team.trim() && !starting) void start()
+          }}
+        >
+          <label htmlFor="team" className="field-label">
+            Nazwa drużyny
+          </label>
+          <input
+            id="team"
+            className="answer"
+            placeholder="np. Szybcy Kaliszanie"
+            maxLength={30}
+            autoComplete="off"
+            value={team}
+            onChange={(e) => setTeam(e.target.value)}
+          />
+          <p className="note">Nie podawaj imion i nazwisk, wystarczy nazwa drużyny.</p>
+          {startError && (
+            <p role="alert" className="bad">
+              {startError}
+            </p>
+          )}
+          <button type="submit" className="big" disabled={!team.trim() || starting}>
+            {starting ? 'Startuję…' : 'Start'}
+          </button>
+        </form>
       </main>
     )
   }
@@ -162,17 +188,22 @@ export default function PlayPage() {
       : '—'
     return (
       <main className="play">
-        <h1>Koniec trasy!</h1>
-        <p>
-          Drużyna: <strong>{team}</strong>
-        </p>
-        <p className="big-score">
-          {state.score} / {total} pkt
-        </p>
-        <p>Czas: {duration}</p>
-        <p>
-          Poprawne odpowiedzi: {state.correctCount} z {route.points.length}
-        </p>
+        <section className="card">
+          <FocusHeading>Koniec trasy!</FocusHeading>
+          <p>
+            Drużyna: <strong>{team}</strong>
+          </p>
+          <p className="big-score">
+            {state.score} <span className="unit">/ {total} pkt</span>
+          </p>
+          <p>Czas: {duration}</p>
+          <p>
+            Poprawne odpowiedzi: {state.correctCount} z {route.points.length}
+          </p>
+        </section>
+        <Link className="big secondary" to={`/ranking/${route.code}`}>
+          Zobacz ranking
+        </Link>
         <button
           className="big secondary"
           onClick={() => {
@@ -190,6 +221,8 @@ export default function PlayPage() {
   const point = route.points[state.currentIdx]
   const dist = pos ? distanceM(pos.lat, pos.lng, point.lat, point.lng) : null
   const inRange = unlocked || (pos !== null && isInRange(pos, point))
+  const prox = dist !== null ? proximity(dist, point.radiusM) : null
+  const shown = dist !== null ? fmtDist(dist) : null
 
   // Tryb awaryjny (włącza nauczyciel): przycisk tylko gdy GPS zawodzi albo jesteś blisko
   const manualAllowed =
@@ -217,9 +250,11 @@ export default function PlayPage() {
   return (
     <main className="play">
       <header className="hud">
-        <span>{team}</span>
-        <span>{state.score} pkt</span>
+        <span className="chip">{team}</span>
+        <span className="chip">{state.score} pkt</span>
       </header>
+
+      <ProgressBar done={state.currentIdx} total={route.points.length} />
 
       {inRange ? (
         <TaskView
@@ -231,25 +266,42 @@ export default function PlayPage() {
           onNext={onNext}
         />
       ) : (
-        <section>
-          <h2>
+        <section className="card">
+          <FocusHeading>
             Idź do punktu {state.currentIdx + 1} z {route.points.length}
-          </h2>
+          </FocusHeading>
+
           {gpsError && (
             <p role="alert" className="bad">
               {gpsError}
             </p>
           )}
-          {!gpsError && dist === null && <p>Szukam Twojej pozycji…</p>}
-          {dist !== null && <p className="big-score">{Math.round(dist)} m</p>}
+          {!gpsError && shown === null && <p role="status">Szukam Twojej pozycji…</p>}
+
+          {shown && prox && (
+            <div className="distance">
+              <p className="big-score">
+                {shown.value} <span className="unit">{shown.unit}</span>
+              </p>
+              <span className={prox === 'veryNear' || prox === 'here' ? 'badge near' : 'badge'}>
+                {PROXIMITY_LABEL[prox]}
+              </span>
+              {/* Czytnik ekranu ogłasza tylko zmianę kategorii, a nie każdy metr */}
+              <p className="sr-only" aria-live="polite">
+                {PROXIMITY_LABEL[prox]}
+              </p>
+            </div>
+          )}
+
           {pos && (
             <p className="note">
               Dokładność GPS: ±{Math.round(pos.accuracy)} m. Zadanie odblokuje się w promieniu{' '}
-              {point.radiusM} m.
+              {point.radiusM} m od punktu.
             </p>
           )}
+
           <a
-            className="big link-btn"
+            className="big"
             href={`https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=walking`}
             target="_blank"
             rel="noreferrer"
