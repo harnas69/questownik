@@ -6,6 +6,7 @@ import icon from 'leaflet/dist/images/marker-icon.png'
 import icon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import shadow from 'leaflet/dist/images/marker-shadow.png'
 import type { DraftPoint } from '../types/route'
+import { TILE_ATTRIBUTION, TILE_URL } from '../lib/tiles'
 
 L.Icon.Default.mergeOptions({
   iconUrl: icon,
@@ -29,11 +30,7 @@ function ClickHandler({ onAdd }: { onAdd: Props['onAdd'] }) {
 export default function MapView({ points, selected, onAdd, onSelect, onMove }: Props) {
   return (
     <MapContainer center={[51.7611, 18.091]} zoom={15} style={{ height: '70vh', width: '100%' }}>
-      <TileLayer
-        crossOrigin
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-      />
+      <TileLayer crossOrigin attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       <ClickHandler onAdd={onAdd} />
       {points.map((p, i) => (
         <Fragment key={i}>

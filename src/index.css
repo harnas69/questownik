@@ -190,3 +190,30 @@ button.big.secondary, a.big.secondary {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Mapa w grze */
+.map-block { display: flex; flex-direction: column; gap: 8px; }
+.map-wrap {
+  position: relative; isolation: isolate;
+  border: 2px solid var(--border); border-radius: var(--radius); overflow: hidden;
+}
+.map-wrap .leaflet-container {
+  height: min(52vh, 400px); min-height: 260px; width: 100%; font: inherit;
+}
+.pin {
+  background: none; border: 0; font-size: 2rem; line-height: 1;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 0.45));
+}
+.arrived {
+  text-align: center; font-size: 1.2rem; font-weight: 800;
+  background: var(--primary); color: var(--on-primary);
+  border-radius: var(--radius); padding: 10px;
+}
+
+/* Poprawki z testów na telefonie */
+.code-input::placeholder { text-transform: none; letter-spacing: normal; font-size: 1.1rem; font-weight: 400; }
+button.big:disabled {
+  opacity: 1; background: var(--surface-2); color: var(--muted); border-color: var(--border);
+}
+input[type="checkbox"] { border-color: var(--text); }
+.editor .row input:not([type="checkbox"]):not([type="file"]) { flex: 1 1 220px; }

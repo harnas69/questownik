@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import ArrivalFeedback from '../components/ArrivalFeedback'
 import FocusHeading from '../components/FocusHeading'
+import PlayMap from '../components/PlayMap'
 import ProgressBar from '../components/ProgressBar'
 import TaskView from '../components/TaskView'
 import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
+import { plural } from '../lib/plural'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
 import { createSession, fetchSessionState } from '../lib/sessionApi'
@@ -138,12 +141,14 @@ export default function PlayPage() {
       }
     }
 
+    const n = route.points.length
     return (
       <main className="play">
         <div className="hero">
           <h1>{route.title}</h1>
           <p className="lead">
-            {route.points.length} punktów do odwiedzenia. Gra korzysta z Twojej lokalizacji.
+            {n} {plural(n, 'punkt', 'punkty', 'punktów')} do odwiedzenia. Gra korzysta z Twojej
+            lokalizacji.
           </p>
         </div>
         <form
@@ -257,14 +262,17 @@ export default function PlayPage() {
       <ProgressBar done={state.currentIdx} total={route.points.length} />
 
       {inRange ? (
-        <TaskView
-          key={point.id}
-          point={point}
-          index={state.currentIdx}
-          total={route.points.length}
-          sessionId={sessionId}
-          onNext={onNext}
-        />
+        <>
+          <ArrivalFeedback key={point.id} />
+          <TaskView
+            key={point.id}
+            point={point}
+            index={state.currentIdx}
+            total={route.points.length}
+            sessionId={sessionId}
+            onNext={onNext}
+          />
+        </>
       ) : (
         <section className="card">
           <FocusHeading>
@@ -293,6 +301,8 @@ export default function PlayPage() {
             </div>
           )}
 
+          <PlayMap key={point.id} target={point} pos={pos} />
+
           {pos && (
             <p className="note">
               Dokładność GPS: ±{Math.round(pos.accuracy)} m. Zadanie odblokuje się w promieniu{' '}
@@ -300,14 +310,6 @@ export default function PlayPage() {
             </p>
           )}
 
-          <a
-            className="big"
-            href={`https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=walking`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Nawiguj w Mapach Google
-          </a>
           {manualAllowed && (
             <button className="big secondary" onClick={() => setUnlocked(true)}>
               Jestem na miejscu
@@ -318,6 +320,14 @@ export default function PlayPage() {
               [debug] Symuluj dojście
             </button>
           )}
+          <a
+            className="big secondary"
+            href={`https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=walking`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Otwórz w Mapach Google
+          </a>
         </section>
       )}
     </main>
