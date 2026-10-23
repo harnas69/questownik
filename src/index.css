@@ -288,3 +288,21 @@ input[type="checkbox"]:checked::after {
 @media (max-width: 800px) {
   .layout .leaflet-container { height: 45vh !important; min-height: 280px; }
 }
+
+/* Znaczniki z numerem na mapie edytora */
+.num-pin-wrap { background: none; border: 0; }
+.num-pin {
+  display: grid; place-items: center; width: 34px; height: 34px;
+  border-radius: 50%; background: #fff; color: #111;
+  border: 3px solid #1c7ed6; font-weight: 800; font-size: 1rem;
+  box-shadow: 0 2px 5px rgb(0 0 0 / 0.45);
+}
+.num-pin.sel { background: #ffd43b; border-color: #d9480f; }
+
+/* Panel udostępniania: dane po lewej, QR po prawej */
+.share { max-width: 880px; }
+.share-body { display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start; }
+.share-info { flex: 1 1 320px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.share-qr { flex: 0 0 auto; }
+.share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-actions button { flex: 1 1 180px; }

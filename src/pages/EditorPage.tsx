@@ -141,6 +141,16 @@ export default function EditorPage() {
     e.target.value = ''
   }
 
+  // Po zapisie pokazujemy tylko panel udostępniania
+  if (code) {
+    return (
+      <main className="editor">
+        <h1>{title.trim() || 'Edytor tras'}</h1>
+        <SharePanel code={code} onReset={reset} onEdit={() => setCode(null)} onExport={onExport} />
+      </main>
+    )
+  }
+
   return (
     <main className="editor">
       <h1>Edytor tras</h1>
@@ -181,8 +191,6 @@ export default function EditorPage() {
         </p>
       )}
 
-      {code && <SharePanel code={code} onReset={reset} />}
-
       <div className="toolbar" role="group" aria-label="Dodawanie i przesuwanie punktów">
         <button type="button" onClick={addAtCenter}>
           Dodaj punkt na środku mapy
@@ -221,7 +229,9 @@ export default function EditorPage() {
               onDelete={() => remove(selected)}
             />
           ) : (
-            points.length > 0 && <p className="note">Wybierz punkt z listy lub z mapy, aby go edytować.</p>
+            points.length > 0 && (
+              <p className="note">Wybierz punkt z listy lub z mapy, aby go edytować.</p>
+            )
           )}
         </aside>
       </div>
