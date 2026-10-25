@@ -17,37 +17,8 @@ import {
 } from '../lib/teacherApi'
 import type { Overview, PhotoItem, TeamResult } from '../lib/teacherApi'
 import { TASK_LABELS } from '../types/route'
+import { forgetKey, readKey, storeKey } from '../lib/teacherKey'
 
-const storageKey = (code: string) => `questownik:teacher:${code}`
-
-function storeKey(code: string, key: string) {
-  try {
-    sessionStorage.setItem(storageKey(code), key)
-  } catch {
-    // pomijamy
-  }
-}
-
-function forgetKey(code: string) {
-  try {
-    sessionStorage.removeItem(storageKey(code))
-  } catch {
-    // pomijamy
-  }
-}
-
-function readKey(code: string): string {
-  const fromHash = window.location.hash.replace(/^#/, '')
-  if (fromHash) {
-    storeKey(code, fromHash)
-    return fromHash
-  }
-  try {
-    return sessionStorage.getItem(storageKey(code)) ?? ''
-  } catch {
-    return ''
-  }
-}
 
 function fmt(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -483,6 +454,24 @@ export default function TeacherPage() {
           <button type="button" onClick={() => void toggleClosed()}>
             {overview.closed ? 'Wznów grę' : 'Zakończ grę'}
           </button>
+        </div>
+
+                <div className="manage-item">
+          <p>
+            <strong>Edytuj trasę</strong>: zmień punkty, zadania i odpowiedzi. Kod trasy i linki
+            zostają bez zmian. Edycja jest możliwa tylko wtedy, gdy nie ma jeszcze wyników
+            żadnej drużyny.
+          </p>
+          {overview.teams === 0 ? (
+            <Link className="btn-link" to={`/edytor/${code}#${key}`}>
+              Edytuj trasę
+            </Link>
+          ) : (
+            <p className="note">
+              Trasa ma już wyniki ({overview.teams} drużyn). Pobierz CSV i użyj „Wyczyść wyniki
+              graczy”, aby odblokować edycję.
+            </p>
+          )}
         </div>
 
         <div className="manage-item">

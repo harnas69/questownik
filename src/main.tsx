@@ -30,7 +30,15 @@ createRoot(document.getElementById('root')!).render(
             path="/edytor"
             element={
               <Suspense fallback={<Loading />}>
-                <EditorPage />
+                <EditorPage key="new" />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/edytor/:code"
+            element={
+              <Suspense fallback={<Loading />}>
+                <EditorPage key="edit" />
               </Suspense>
             }
           />

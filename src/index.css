@@ -364,3 +364,11 @@ button.approve:not(:disabled) { background: var(--primary); color: var(--on-prim
 }
 .manage-item.danger { border-color: var(--bad); }
 .manage-item input { width: 100%; max-width: 320px; }
+
+/* Link wyglądający jak przycisk */
+.btn-link {
+  display: inline-block; min-height: 44px; padding: 10px 16px;
+  border: 2px solid var(--text); border-radius: var(--radius);
+  background: var(--surface); color: var(--text);
+  font-weight: 600; text-decoration: none; text-align: center;
+}

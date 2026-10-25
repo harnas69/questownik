@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import type { Map as LeafletMap } from 'leaflet'
 import MapView from '../components/MapView'
 import PointForm from '../components/PointForm'
@@ -8,9 +9,33 @@ import SharePanel from '../components/SharePanel'
 import { saveRoute } from '../lib/routes'
 import { moveItem, newPoint, validatePoints } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
+import { getRouteForEdit, isForbidden, updateRoute } from '../lib/teacherApi'
+import { readKey } from '../lib/teacherKey'
 import type { DraftPoint } from '../types/route'
 
+type LoadState = 'loading' | 'ready' | 'blocked' | 'denied' | 'error'
+
+function saveErrorMessage(e: unknown, editing: boolean): string {
+  const msg = (e as { message?: string } | null)?.message ?? ''
+  if (editing && msg.includes('route has sessions')) {
+    return 'Ktoś właśnie rozpoczął grę na tej trasie, więc nie można jej już edytować. Wróć do panelu nauczyciela.'
+  }
+  if (editing && msg.includes('forbidden')) {
+    return 'Brak uprawnień: klucz nauczyciela jest nieprawidłowy.'
+  }
+  return editing ? 'Nie udało się zapisać zmian.' : 'Nie udało się zapisać trasy.'
+}
+
 export default function EditorPage() {
+  const { code: editParam } = useParams()
+  const editing = editParam !== undefined
+  const editCode = (editParam ?? '').toUpperCase()
+  const [editKey] = useState(() => (editing ? readKey(editCode) : ''))
+  const [loadState, setLoadState] = useState<LoadState>(() =>
+    editing ? (editKey ? 'loading' : 'denied') : 'ready'
+  )
+  const [updated, setUpdated] = useState(false)
+
   const [title, setTitle] = useState('')
   const [points, setPoints] = useState<DraftPoint[]>([])
   const [selected, setSelected] = useState<number | null>(null)
@@ -28,13 +53,40 @@ export default function EditorPage() {
     countRef.current = points.length
   }, [points.length])
 
+  // Wczytanie trasy do edycji
+  useEffect(() => {
+    if (!editing || !editKey) return
+    let cancelled = false
+    getRouteForEdit(editCode, editKey)
+      .then((r) => {
+        if (cancelled) return
+        if (r.sessions > 0) {
+          setLoadState('blocked')
+          return
+        }
+        setTitle(r.title)
+        setPoints(r.points)
+        setAllowManual(r.allowManual)
+        setSelected(r.points.length > 0 ? 0 : null)
+        setLoadState('ready')
+      })
+      .catch((e) => {
+        if (cancelled) return
+        console.error(e)
+        setLoadState(isForbidden(e) ? 'denied' : 'error')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [editing, editCode, editKey])
+
   // Ostrzeżenie przed zamknięciem karty z niezapisanymi punktami
   useEffect(() => {
-    if (points.length === 0 || code) return
+    if (points.length === 0 || code || updated) return
     const handler = (e: BeforeUnloadEvent) => e.preventDefault()
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [points.length, code])
+  }, [points.length, code, updated])
 
   const add = (lat: number, lng: number) => {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
@@ -107,12 +159,17 @@ export default function EditorPage() {
     try {
       setError(null)
       setSaving(true)
-      const saved = await saveRoute(title, points, allowManual)
-      setCode(saved.code)
-      setTeacherKey(saved.teacherKey)
+      if (editing) {
+        await updateRoute(editCode, editKey, title, points, allowManual)
+        setUpdated(true)
+      } else {
+        const saved = await saveRoute(title, points, allowManual)
+        setCode(saved.code)
+        setTeacherKey(saved.teacherKey)
+      }
     } catch (e) {
-      setError('Nie udało się zapisać trasy.')
       console.error(e)
+      setError(saveErrorMessage(e, editing))
     } finally {
       setSaving(false)
     }
@@ -146,7 +203,82 @@ export default function EditorPage() {
     e.target.value = ''
   }
 
-  // Po zapisie pokazujemy tylko panel udostępniania
+  const panelPath = `/nauczyciel/${editCode}#${editKey}`
+
+  // ---- Ekrany edycji: wczytywanie, brak dostępu, blokada ----
+  if (editing && loadState === 'loading') {
+    return (
+      <main className="play">
+        <p role="status">Wczytuję trasę do edycji…</p>
+      </main>
+    )
+  }
+
+  if (editing && loadState === 'denied') {
+    return (
+      <main className="play">
+        <h1>Edycja trasy</h1>
+        <p role="alert" className="bad">
+          Brak dostępu: klucz nauczyciela jest nieprawidłowy lub go brakuje. Wejdź do edycji
+          przyciskiem w panelu nauczyciela (z linku, który pokazał się po zapisaniu trasy).
+        </p>
+        <Link to="/">Strona główna</Link>
+      </main>
+    )
+  }
+
+  if (editing && loadState === 'error') {
+    return (
+      <main className="play">
+        <h1>Edycja trasy</h1>
+        <p role="alert" className="bad">
+          Nie udało się wczytać trasy. Sprawdź internet i odśwież stronę.
+        </p>
+      </main>
+    )
+  }
+
+  if (editing && loadState === 'blocked') {
+    return (
+      <main className="play">
+        <h1>Edycja niedostępna</h1>
+        <p role="alert" className="bad">
+          Ta trasa ma już wyniki drużyn, więc nie można jej edytować. Pobierz wyniki (CSV) i
+          wyczyść je w panelu nauczyciela, a potem wróć do edycji.
+        </p>
+        <Link className="btn-link" to={panelPath}>
+          Wróć do panelu nauczyciela
+        </Link>
+      </main>
+    )
+  }
+
+  if (editing && updated) {
+    return (
+      <main className="editor">
+        <h1>Trasa zaktualizowana</h1>
+        <section className="card share">
+          <p role="status">
+            Zmiany zapisane. Kod trasy <strong className="route-code">{editCode}</strong> i linki
+            dla graczy pozostają takie same.
+          </p>
+          <p className="note">
+            Jeśli ktoś miał otwartą stronę gry przed zmianą, niech ją odświeży przed startem.
+          </p>
+          <div className="share-actions">
+            <Link className="btn-link" to={panelPath}>
+              Wróć do panelu nauczyciela
+            </Link>
+            <button type="button" onClick={() => setUpdated(false)}>
+              Edytuj dalej
+            </button>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
+  // ---- Po zapisie nowej trasy: tylko panel udostępniania ----
   if (code) {
     return (
       <main className="editor">
@@ -167,7 +299,13 @@ export default function EditorPage() {
 
   return (
     <main className="editor">
-      <h1>Edytor tras</h1>
+      <h1>{editing ? `Edycja trasy ${editCode}` : 'Edytor tras'}</h1>
+      {editing && (
+        <p className="note">
+          Kod trasy i linki nie zmienią się po zapisaniu.{' '}
+          <Link to={panelPath}>Wróć do panelu nauczyciela</Link>
+        </p>
+      )}
 
       <div className="row">
         <input
@@ -177,7 +315,11 @@ export default function EditorPage() {
           onChange={(e) => setTitle(e.target.value)}
         />
         <button onClick={save} disabled={!title.trim() || points.length === 0 || saving}>
-          {saving ? 'Zapisuję…' : `Zapisz trasę (${points.length} pkt)`}
+          {saving
+            ? 'Zapisuję…'
+            : editing
+              ? `Zapisz zmiany (${points.length} pkt)`
+              : `Zapisz trasę (${points.length} pkt)`}
         </button>
         <button onClick={onExport} disabled={!title.trim() || points.length === 0}>
           Eksport JSON
