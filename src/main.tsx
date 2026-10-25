@@ -9,6 +9,7 @@ import './index.css'
 
 const EditorPage = lazy(() => import('./pages/EditorPage'))
 const RankingPage = lazy(() => import('./pages/RankingPage'))
+const TeacherPage = lazy(() => import('./pages/TeacherPage'))
 
 function Loading() {
   return (
@@ -39,6 +40,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <Suspense fallback={<Loading />}>
                 <RankingPage />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/nauczyciel/:code"
+            element={
+              <Suspense fallback={<Loading />}>
+                <TeacherPage />
               </Suspense>
             }
           />

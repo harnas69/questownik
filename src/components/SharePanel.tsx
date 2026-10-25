@@ -4,14 +4,18 @@ import CopyButton from './CopyButton'
 
 interface Props {
   code: string
+  teacherKey: string | null
   onReset: () => void
   onEdit: () => void
   onExport: () => void
 }
 
-export default function SharePanel({ code, onReset, onEdit, onExport }: Props) {
+export default function SharePanel({ code, teacherKey, onReset, onEdit, onExport }: Props) {
   const gameUrl = `${window.location.origin}/gra/${code}`
   const rankingUrl = `${window.location.origin}/ranking/${code}`
+  const teacherUrl = teacherKey
+    ? `${window.location.origin}/nauczyciel/${code}#${teacherKey}`
+    : null
   const [qr, setQr] = useState<string | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
 
@@ -78,6 +82,20 @@ export default function SharePanel({ code, onReset, onEdit, onExport }: Props) {
         )}
       </div>
 
+      {teacherUrl && (
+        <div className="teacher-box">
+          <h3>Panel nauczyciela (zdjęcia)</h3>
+          <p>
+            Ta trasa ma zadania ze zdjęciem. Zatwierdzać je może tylko osoba z poniższym linkiem.
+            Link pokazuje się tylko teraz, więc zapisz go (nie udostępniaj uczniom).
+          </p>
+          <div className="share-row">
+            <a href={teacherUrl}>Otwórz panel nauczyciela</a>
+            <CopyButton text={teacherUrl} label="Kopiuj link nauczyciela" />
+          </div>
+        </div>
+      )}
+
       <div className="share-actions">
         <button type="button" onClick={onReset}>
           Nowa trasa
@@ -91,7 +109,7 @@ export default function SharePanel({ code, onReset, onEdit, onExport }: Props) {
       </div>
       <p className="note">
         Zapisanej trasy nie można zmienić. „Wróć do edycji” zachowuje punkty, ale kolejny zapis
-        utworzy nową trasę z nowym kodem.
+        utworzy nową trasę z nowym kodem (i nowym linkiem nauczyciela).
       </p>
     </section>
   )

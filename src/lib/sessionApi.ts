@@ -26,6 +26,28 @@ export async function createSession(routeId: string, teamName: string): Promise<
   return data as string
 }
 
+interface RawResult {
+  correct: boolean
+  earned: number
+  attempts: number
+  current_idx: number
+  score: number
+  correct_count: number
+  finished_at: string | null
+}
+
+function toResult(d: RawResult): AnswerResult {
+  return {
+    correct: d.correct,
+    earned: d.earned,
+    attempts: d.attempts,
+    currentIdx: d.current_idx,
+    score: d.score,
+    correctCount: d.correct_count,
+    finishedAt: d.finished_at,
+  }
+}
+
 export async function submitAnswer(
   sessionId: string,
   pointId: string,
@@ -39,15 +61,21 @@ export async function submitAnswer(
     p_skip: skip,
   })
   if (error) throw error
-  return {
-    correct: data.correct,
-    earned: data.earned,
-    attempts: data.attempts,
-    currentIdx: data.current_idx,
-    score: data.score,
-    correctCount: data.correct_count,
-    finishedAt: data.finished_at,
-  }
+  return toResult(data as RawResult)
+}
+
+export async function submitPhoto(
+  sessionId: string,
+  pointId: string,
+  image: string
+): Promise<AnswerResult> {
+  const { data, error } = await supabase.rpc('submit_photo', {
+    p_session: sessionId,
+    p_point: pointId,
+    p_image: image,
+  })
+  if (error) throw error
+  return toResult(data as RawResult)
 }
 
 export async function fetchSessionState(id: string): Promise<SessionState | null> {

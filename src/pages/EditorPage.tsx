@@ -15,6 +15,7 @@ export default function EditorPage() {
   const [points, setPoints] = useState<DraftPoint[]>([])
   const [selected, setSelected] = useState<number | null>(null)
   const [code, setCode] = useState<string | null>(null)
+  const [teacherKey, setTeacherKey] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [locating, setLocating] = useState(false)
@@ -92,6 +93,7 @@ export default function EditorPage() {
     setPoints([])
     setSelected(null)
     setCode(null)
+    setTeacherKey(null)
     setError(null)
     setAllowManual(false)
   }
@@ -105,7 +107,9 @@ export default function EditorPage() {
     try {
       setError(null)
       setSaving(true)
-      setCode(await saveRoute(title, points, allowManual))
+      const saved = await saveRoute(title, points, allowManual)
+      setCode(saved.code)
+      setTeacherKey(saved.teacherKey)
     } catch (e) {
       setError('Nie udało się zapisać trasy.')
       console.error(e)
@@ -134,6 +138,7 @@ export default function EditorPage() {
       setPoints(route.points)
       setSelected(0)
       setCode(null)
+      setTeacherKey(null)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się wczytać pliku.')
@@ -146,7 +151,16 @@ export default function EditorPage() {
     return (
       <main className="editor">
         <h1>{title.trim() || 'Edytor tras'}</h1>
-        <SharePanel code={code} onReset={reset} onEdit={() => setCode(null)} onExport={onExport} />
+        <SharePanel
+          code={code}
+          teacherKey={points.some((p) => p.taskType === 'photo') ? teacherKey : null}
+          onReset={reset}
+          onEdit={() => {
+            setCode(null)
+            setTeacherKey(null)
+          }}
+          onExport={onExport}
+        />
       </main>
     )
   }

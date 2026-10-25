@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import type { AnswerResult, GamePoint } from '../types/game'
-import { submitAnswer } from '../lib/sessionApi'
+import { submitAnswer, submitPhoto } from '../lib/sessionApi'
+import { resizeToJpeg } from '../lib/image'
 import FocusHeading from './FocusHeading'
 
 interface Props {
@@ -19,6 +21,9 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [netError, setNetError] = useState(false)
+  const [photo, setPhoto] = useState<string | null>(null)
+  const [preparing, setPreparing] = useState(false)
+  const [photoError, setPhotoError] = useState<string | null>(null)
   const nextRef = useRef<HTMLButtonElement>(null)
 
   // Po dobrej odpowiedzi przycisk "Sprawdź" znika, więc przenosimy fokus na "Dalej"
@@ -26,14 +31,40 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
     if (state === 'right') nextRef.current?.focus()
   }, [state])
 
-  const isInfo = point.taskType === 'text' || point.taskType === 'photo'
+  const isPhoto = point.taskType === 'photo'
+  const isInfo = point.taskType === 'text'
   const isQuiz = point.taskType === 'quiz'
-  const canSubmit = !busy && (isInfo || (isQuiz ? choice !== null : text.trim() !== ''))
+  const canSubmit =
+    !busy &&
+    !preparing &&
+    (isInfo || (isPhoto ? photo !== null : isQuiz ? choice !== null : text.trim() !== ''))
+
+  const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setPhotoError(null)
+    setPreparing(true)
+    try {
+      setPhoto(await resizeToJpeg(file))
+    } catch (err) {
+      console.error(err)
+      setPhotoError('Nie udało się odczytać zdjęcia. Spróbuj zrobić je jeszcze raz.')
+    } finally {
+      setPreparing(false)
+    }
+  }
 
   const send = async (skip: boolean) => {
     setBusy(true)
     setNetError(false)
     try {
+      if (isPhoto && photo) {
+        const res = await submitPhoto(sessionId, point.id, photo)
+        setResult(res)
+        setState('right')
+        return
+      }
       const given = skip || isInfo ? null : isQuiz ? choice : text
       const res = await submitAnswer(sessionId, point.id, given, skip)
       setAttempts(res.attempts)
@@ -62,8 +93,28 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       </FocusHeading>
       <p className="prompt">{point.content.prompt || 'Jesteś na miejscu!'}</p>
 
-      {point.taskType === 'photo' && (
-        <p>Zrób zdjęcie, a potem kliknij przycisk poniżej. (Wysyłanie zdjęć dodamy później.)</p>
+      {isPhoto && state !== 'right' && (
+        <div className="photo-box">
+          <p className="note">
+            Nie fotografuj osób: zrób zdjęcie miejsca lub przedmiotu. Zdjęcie zobaczy nauczyciel.
+          </p>
+          {photo && <img className="photo-preview" src={photo} alt="Podgląd zrobionego zdjęcia" />}
+          <label className="file photo-pick">
+            {preparing ? 'Przygotowuję zdjęcie…' : photo ? 'Zrób inne zdjęcie' : 'Zrób zdjęcie'}
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={onPick}
+              disabled={preparing || busy}
+            />
+          </label>
+          {photoError && (
+            <p role="alert" className="bad">
+              {photoError}
+            </p>
+          )}
+        </div>
       )}
 
       {isQuiz && state !== 'right' && (
@@ -115,7 +166,9 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
         <>
           <p className="good" role="status">
             <span aria-hidden="true">✓ </span>
-            {isInfo ? 'Zaliczone!' : 'Dobrze!'} +{result.earned} pkt
+            {isPhoto
+              ? 'Zdjęcie wysłane! Punkty pojawią się po zatwierdzeniu przez nauczyciela.'
+              : `${isInfo ? 'Zaliczone!' : 'Dobrze!'} +${result.earned} pkt`}
           </p>
           <button ref={nextRef} className="big" onClick={() => onNext(result)}>
             Dalej
@@ -125,12 +178,14 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
         <>
           <button className="big" onClick={() => send(false)} disabled={!canSubmit}>
             {busy
-              ? 'Sprawdzam…'
-              : isInfo
-                ? point.taskType === 'photo'
-                  ? 'Zrobiłem zdjęcie'
-                  : 'Czytam dalej'
-                : 'Sprawdź'}
+              ? isPhoto
+                ? 'Wysyłam…'
+                : 'Sprawdzam…'
+              : isPhoto
+                ? 'Wyślij zdjęcie'
+                : isInfo
+                  ? 'Czytam dalej'
+                  : 'Sprawdź'}
           </button>
           {state === 'wrong' && attempts >= 2 && (
             <button className="big secondary" onClick={() => send(true)} disabled={busy}>
