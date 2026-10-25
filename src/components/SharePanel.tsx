@@ -84,10 +84,11 @@ export default function SharePanel({ code, teacherKey, onReset, onEdit, onExport
 
       {teacherUrl && (
         <div className="teacher-box">
-          <h3>Panel nauczyciela (zdjęcia)</h3>
+                    <h3>Panel nauczyciela</h3>
           <p>
-            Ta trasa ma zadania ze zdjęciem. Zatwierdzać je może tylko osoba z poniższym linkiem.
-            Link pokazuje się tylko teraz, więc zapisz go (nie udostępniaj uczniom).
+            W panelu zobaczysz wyniki i statystyki, pobierzesz CSV, ocenisz zdjęcia oraz zakończysz
+            grę lub usuniesz trasę. Dostęp ma tylko osoba z poniższym linkiem. Link pokazuje się
+            tylko teraz, więc zapisz go (nie udostępniaj uczniom).
           </p>
           <div className="share-row">
             <a href={teacherUrl}>Otwórz panel nauczyciela</a>

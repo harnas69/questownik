@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import type { AnswerResult, GamePoint } from '../types/game'
-import { submitAnswer, submitPhoto } from '../lib/sessionApi'
+import { isGameClosed, submitAnswer, submitPhoto } from '../lib/sessionApi'
 import { resizeToJpeg } from '../lib/image'
 import FocusHeading from './FocusHeading'
 
@@ -21,6 +21,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
   const [result, setResult] = useState<AnswerResult | null>(null)
   const [busy, setBusy] = useState(false)
   const [netError, setNetError] = useState(false)
+  const [closed, setClosed] = useState(false)
   const [photo, setPhoto] = useState<string | null>(null)
   const [preparing, setPreparing] = useState(false)
   const [photoError, setPhotoError] = useState<string | null>(null)
@@ -37,6 +38,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
   const canSubmit =
     !busy &&
     !preparing &&
+    !closed &&
     (isInfo || (isPhoto ? photo !== null : isQuiz ? choice !== null : text.trim() !== ''))
 
   const onPick = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -80,7 +82,8 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
       }
     } catch (e) {
       console.error(e)
-      setNetError(true)
+      if (isGameClosed(e)) setClosed(true)
+      else setNetError(true)
     } finally {
       setBusy(false)
     }
@@ -148,6 +151,12 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
         />
       )}
 
+      {closed && (
+        <p role="alert" className="bad">
+          Nauczyciel zakończył tę grę. Twoje dotychczasowe wyniki zostają w rankingu.
+        </p>
+      )}
+
       {netError && (
         <p role="alert" className="bad">
           Brak połączenia z serwerem. Sprawdź internet i spróbuj ponownie. Jeśli problem się
@@ -188,7 +197,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
                   : 'Sprawdź'}
           </button>
           {state === 'wrong' && attempts >= 2 && (
-            <button className="big secondary" onClick={() => send(true)} disabled={busy}>
+            <button className="big secondary" onClick={() => send(true)} disabled={busy || closed}>
               Pomiń (0 pkt)
             </button>
           )}

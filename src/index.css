@@ -349,3 +349,18 @@ input[type="checkbox"]:checked::after {
 .status.rejected { color: var(--bad); border-color: var(--bad); }
 .status.rejected::before { content: "✗ "; }
 button.approve:not(:disabled) { background: var(--primary); color: var(--on-primary); border-color: var(--on-primary); }
+
+/* Panel nauczyciela: wyniki, statystyki, zarządzanie */
+.teacher { max-width: 960px; }
+.block { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.notice { min-height: 1.5em; color: var(--good); font-weight: 700; }
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table th, .data-table td {
+  text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top;
+}
+.manage-item {
+  display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+  border: 2px solid var(--border); border-radius: var(--radius); padding: 12px;
+}
+.manage-item.danger { border-color: var(--bad); }
+.manage-item input { width: 100%; max-width: 320px; }

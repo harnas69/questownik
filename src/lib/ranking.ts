@@ -13,7 +13,7 @@ export function durationMs(r: SessionRow): number | null {
 }
 
 // Więcej punktów wygrywa. Remis: kto skończył, a wśród skończonych kto szybciej.
-export function sortRanking(rows: SessionRow[]): SessionRow[] {
+export function sortRanking<T extends SessionRow>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score
     const da = durationMs(a)

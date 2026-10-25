@@ -136,3 +136,8 @@ export function subscribeSessions(routeId: string, onChange: () => void): () => 
     supabase.removeChannel(channel)
   }
 }
+
+export function isGameClosed(e: unknown): boolean {
+  const msg = (e as { message?: string } | null)?.message ?? ''
+  return msg.includes('game closed')
+}

@@ -153,7 +153,7 @@ export default function EditorPage() {
         <h1>{title.trim() || 'Edytor tras'}</h1>
         <SharePanel
           code={code}
-          teacherKey={points.some((p) => p.taskType === 'photo') ? teacherKey : null}
+          teacherKey={teacherKey}
           onReset={reset}
           onEdit={() => {
             setCode(null)

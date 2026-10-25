@@ -10,7 +10,7 @@ import type { GeoPos } from '../lib/geo'
 import { plural } from '../lib/plural'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
-import { createSession, fetchSessionState } from '../lib/sessionApi'
+import { createSession, fetchSessionState, isGameClosed } from '../lib/sessionApi'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
@@ -135,7 +135,11 @@ export default function PlayPage() {
         setState(s)
       } catch (e) {
         console.error(e)
-        setStartError('Nie udało się rozpocząć gry. Sprawdź internet i spróbuj ponownie.')
+                setStartError(
+          isGameClosed(e)
+            ? 'Ta gra została zakończona przez nauczyciela.'
+            : 'Nie udało się rozpocząć gry. Sprawdź internet i spróbuj ponownie.'
+        )
       } finally {
         setStarting(false)
       }
@@ -206,6 +210,9 @@ export default function PlayPage() {
           <p>
             Poprawne odpowiedzi: {state.correctCount} z {route.points.length}
           </p>
+          {route.points.some((p) => p.taskType === 'photo') && (
+            <p className="note">Punkty za zdjęcia pojawią się po zatwierdzeniu przez nauczyciela.</p>
+          )}
         </section>
         <Link className="big secondary" to={`/ranking/${route.code}`}>
           Zobacz ranking
