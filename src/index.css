@@ -306,3 +306,13 @@ input[type="checkbox"]:checked::after {
 .share-qr { flex: 0 0 auto; }
 .share-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .share-actions button { flex: 1 1 180px; }
+
+/* Cele dotyku na mapie */
+.leaflet-touch .leaflet-bar a,
+.leaflet-bar a {
+  width: 44px;
+  height: 44px;
+  line-height: 44px;
+  font-size: 1.4rem;
+}
+.leaflet-control-attribution a { display: inline-block; padding: 6px 3px; }

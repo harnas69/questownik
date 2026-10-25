@@ -1,13 +1,22 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import HomePage from './pages/HomePage'
-import EditorPage from './pages/EditorPage'
 import PlayPage from './pages/PlayPage'
-import RankingPage from './pages/RankingPage'
 import OfflineBanner from './components/OfflineBanner'
 import './index.css'
+
+const EditorPage = lazy(() => import('./pages/EditorPage'))
+const RankingPage = lazy(() => import('./pages/RankingPage'))
+
+function Loading() {
+  return (
+    <main className="play">
+      <p role="status">Wczytuję…</p>
+    </main>
+  )
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,9 +25,23 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
-          <Route path="/edytor" element={<EditorPage />} />
+          <Route
+            path="/edytor"
+            element={
+              <Suspense fallback={<Loading />}>
+                <EditorPage />
+              </Suspense>
+            }
+          />
           <Route path="/gra/:code" element={<PlayPage />} />
-          <Route path="/ranking/:code" element={<RankingPage />} />
+          <Route
+            path="/ranking/:code"
+            element={
+              <Suspense fallback={<Loading />}>
+                <RankingPage />
+              </Suspense>
+            }
+          />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -192,7 +192,8 @@ export default function PlayPage() {
       ? fmtTime(Date.parse(state.finishedAt) - Date.parse(state.startedAt))
       : '—'
     return (
-      <main className="play">
+       <main className="play">
+        <h1 className="sr-only">{route.title}</h1>
         <section className="card">
           <FocusHeading>Koniec trasy!</FocusHeading>
           <p>
@@ -253,7 +254,8 @@ export default function PlayPage() {
   }
 
   return (
-    <main className="play">
+     <main className="play">
+      <h1 className="sr-only">{route.title}</h1>
       <header className="hud">
         <span className="chip">{team}</span>
         <span className="chip">{state.score} pkt</span>
