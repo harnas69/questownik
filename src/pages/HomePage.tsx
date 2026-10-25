@@ -53,7 +53,7 @@ export default function HomePage() {
       </section>
 
       <p className="note">
-        Jesteś nauczycielem? <Link to="/edytor">Stwórz trasę</Link>
+            Jesteś nauczycielem? <Link to="/konto">Zaloguj się i stwórz trasę</Link>
       </p>
     </main>
   )

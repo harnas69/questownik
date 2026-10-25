@@ -10,6 +10,7 @@ import './index.css'
 const EditorPage = lazy(() => import('./pages/EditorPage'))
 const RankingPage = lazy(() => import('./pages/RankingPage'))
 const TeacherPage = lazy(() => import('./pages/TeacherPage'))
+const AccountPage = lazy(() => import('./pages/AccountPage'))
 
 function Loading() {
   return (
@@ -26,6 +27,14 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
+          <Route
+            path="/konto"
+            element={
+              <Suspense fallback={<Loading />}>
+                <AccountPage />
+              </Suspense>
+            }
+          />
           <Route
             path="/edytor"
             element={

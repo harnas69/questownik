@@ -12,11 +12,18 @@ import { exportRoute, parseRoute } from '../lib/routeJson'
 import { getRouteForEdit, isForbidden, updateRoute } from '../lib/teacherApi'
 import { readKey } from '../lib/teacherKey'
 import type { DraftPoint } from '../types/route'
+import { useAuth } from '../lib/auth'
 
 type LoadState = 'loading' | 'ready' | 'blocked' | 'denied' | 'error'
 
 function saveErrorMessage(e: unknown, editing: boolean): string {
   const msg = (e as { message?: string } | null)?.message ?? ''
+    if (msg.includes('account required')) {
+    return 'Sesja wygasła. Zaloguj się ponownie w nowej karcie (nie zamykaj tej, żeby nie stracić punktów) i zapisz jeszcze raz.'
+  }
+  if (msg.includes('route limit')) {
+    return 'Osiągnięto limit 100 tras na koncie. Usuń niepotrzebne trasy w panelu nauczyciela.'
+  }
   if (editing && msg.includes('route has sessions')) {
     return 'Ktoś właśnie rozpoczął grę na tej trasie, więc nie można jej już edytować. Wróć do panelu nauczyciela.'
   }
@@ -28,6 +35,7 @@ function saveErrorMessage(e: unknown, editing: boolean): string {
 
 export default function EditorPage() {
   const { code: editParam } = useParams()
+  const auth = useAuth()
   const editing = editParam !== undefined
   const editCode = (editParam ?? '').toUpperCase()
   const [editKey] = useState(() => (editing ? readKey(editCode) : ''))
@@ -204,6 +212,30 @@ export default function EditorPage() {
   }
 
   const panelPath = `/nauczyciel/${editCode}#${editKey}`
+    if (!editing && auth.loading) {
+    return (
+      <main className="play">
+        <p role="status">Sprawdzam logowanie…</p>
+      </main>
+    )
+  }
+
+  if (!editing && !auth.user) {
+    return (
+      <main className="play">
+        <h1>Edytor tras</h1>
+        <section className="card">
+          <p>
+            Aby tworzyć i prowadzić trasy, zaloguj się na konto nauczyciela. Trasy zapiszą się na
+            Twoim koncie, a uczniowie grają bez logowania.
+          </p>
+          <Link className="big" to="/konto">
+            Zaloguj się lub załóż konto
+          </Link>
+        </section>
+      </main>
+    )
+  }
 
   // ---- Ekrany edycji: wczytywanie, brak dostępu, blokada ----
   if (editing && loadState === 'loading') {
