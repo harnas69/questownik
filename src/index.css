@@ -316,3 +316,12 @@ input[type="checkbox"]:checked::after {
   font-size: 1.4rem;
 }
 .leaflet-control-attribution a { display: inline-block; padding: 6px 3px; }
+
+.map-loading {
+  display: grid;
+  place-items: center;
+  height: min(52vh, 400px);
+  min-height: 260px;
+  color: var(--muted);
+  background: var(--surface-2);
+}

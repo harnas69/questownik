@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import ArrivalFeedback from '../components/ArrivalFeedback'
 import FocusHeading from '../components/FocusHeading'
-import PlayMap from '../components/PlayMap'
 import ProgressBar from '../components/ProgressBar'
 import TaskView from '../components/TaskView'
 import { loadRoute } from '../lib/gameApi'
@@ -15,6 +14,7 @@ import { createSession, fetchSessionState } from '../lib/sessionApi'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
+const PlayMap = lazy(() => import('../components/PlayMap'))
 function fmtTime(ms: number): string {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
@@ -303,7 +303,15 @@ export default function PlayPage() {
             </div>
           )}
 
-          <PlayMap key={point.id} target={point} pos={pos} />
+                    <Suspense
+            fallback={
+              <div className="map-wrap map-loading" role="status">
+                Wczytuję mapę…
+              </div>
+            }
+          >
+            <PlayMap key={point.id} target={point} pos={pos} />
+          </Suspense>
 
           {pos && (
             <p className="note">
