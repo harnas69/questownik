@@ -44,7 +44,7 @@ createRoot(document.getElementById('root')!).render(
             }
           />
           <Route
-            path="/edytor/:code"
+            path="/edytor/:id"
             element={
               <Suspense fallback={<Loading />}>
                 <EditorPage key="edit" />

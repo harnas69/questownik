@@ -18,6 +18,7 @@ import {
 import type { Overview, PhotoItem, TeamResult } from '../lib/teacherApi'
 import { TASK_LABELS } from '../types/route'
 import { forgetKey, readKey, storeKey } from '../lib/teacherKey'
+import GameShare from '../components/GameShare'
 
 
 function fmt(ms: number): string {
@@ -296,6 +297,11 @@ export default function TeacherPage() {
         </button>
       </div>
 
+      <section className="block" aria-labelledby="h-share">
+        <h2 id="h-share">Dołączanie do gry</h2>
+        <GameShare code={code} />
+      </section>
+
       <section className="block" aria-labelledby="h-results">
         <h2 id="h-results">Wyniki drużyn</h2>
         {teams.length === 0 ? (
@@ -456,22 +462,14 @@ export default function TeacherPage() {
           </button>
         </div>
 
-                <div className="manage-item">
+        <div className="manage-item">
           <p>
-            <strong>Edytuj trasę</strong>: zmień punkty, zadania i odpowiedzi. Kod trasy i linki
-            zostają bez zmian. Edycja jest możliwa tylko wtedy, gdy nie ma jeszcze wyników
-            żadnej drużyny.
+            <strong>Zmiana zadań</strong>: treść działającej gry jest zamrożona, żeby nie psuć
+            wyników. Zmień trasę w zakładce „Moje trasy” i uruchom z niej nową grę.
           </p>
-          {overview.teams === 0 ? (
-            <Link className="btn-link" to={`/edytor/${code}#${key}`}>
-              Edytuj trasę
-            </Link>
-          ) : (
-            <p className="note">
-              Trasa ma już wyniki ({overview.teams} drużyn). Pobierz CSV i użyj „Wyczyść wyniki
-              graczy”, aby odblokować edycję.
-            </p>
-          )}
+          <Link className="btn-link" to="/konto">
+            Przejdź do moich tras
+          </Link>
         </div>
 
         <div className="manage-item">

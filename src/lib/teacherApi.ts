@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import type { SessionRow } from './ranking'
-import type { DraftPoint, TaskType } from '../types/route'
+import type { TaskType } from '../types/route'
 
 export interface PhotoItem {
   id: string
@@ -87,29 +87,3 @@ export async function deleteRoute(code: string, key: string): Promise<void> {
   await call('teacher_delete_route', { p_code: code, p_key: key })
 }
 
-export interface EditableRoute {
-  title: string
-  allowManual: boolean
-  sessions: number
-  points: DraftPoint[]
-}
-
-export function getRouteForEdit(code: string, key: string): Promise<EditableRoute> {
-  return call<EditableRoute>('teacher_get_route', { p_code: code, p_key: key })
-}
-
-export async function updateRoute(
-  code: string,
-  key: string,
-  title: string,
-  points: DraftPoint[],
-  allowManual: boolean
-): Promise<void> {
-  await call('teacher_update_route', {
-    p_code: code,
-    p_key: key,
-    p_title: title.trim(),
-    p_allow_manual: allowManual,
-    p_points: points,
-  })
-}
