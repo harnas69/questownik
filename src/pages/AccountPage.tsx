@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import CopyButton from '../components/CopyButton'
+import PublishForm from '../components/PublishForm'
 import {
   accountErrorMessage,
   claimRoute,
@@ -124,6 +125,12 @@ function LoginForm() {
   )
 }
 
+function statusOf(t: TemplateItem): { text: string; cls: string } {
+  if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
+  if (t.is_public) return { text: 'Publiczna w bibliotece', cls: 'badge near' }
+  return { text: 'Prywatna', cls: 'badge' }
+}
+
 function MyContent() {
   const navigate = useNavigate()
   const [templates, setTemplates] = useState<TemplateItem[] | null>(null)
@@ -157,6 +164,12 @@ function MyContent() {
     setGames(g)
   }
 
+  const afterPublish = async (message: string) => {
+    await reload()
+    setError(null)
+    setNotice(message)
+  }
+
   const launch = async (t: TemplateItem) => {
     setBusyId(t.id)
     setError(null)
@@ -173,7 +186,8 @@ function MyContent() {
   const remove = async (t: TemplateItem) => {
     const extra =
       t.games > 0 ? ` Uruchomione z niej gry (${t.games}) zostaną i nadal będą działać.` : ''
-    if (!window.confirm(`Usunąć trasę „${t.title}”?${extra} Nie da się tego cofnąć.`)) return
+    const pub = t.is_public ? ' Zniknie też z biblioteki.' : ''
+    if (!window.confirm(`Usunąć trasę „${t.title}”?${extra}${pub} Nie da się tego cofnąć.`)) return
     setBusyId(t.id)
     setError(null)
     try {
@@ -217,9 +231,14 @@ function MyContent() {
 
   return (
     <>
-      <Link className="big" to="/edytor">
-        Utwórz nową trasę
-      </Link>
+      <div className="row">
+        <Link className="big" to="/edytor">
+          Utwórz nową trasę
+        </Link>
+        <Link className="big secondary" to="/biblioteka">
+          Przeglądaj bibliotekę tras
+        </Link>
+      </div>
 
       {error && (
         <p role="alert" className="bad">
@@ -234,35 +253,44 @@ function MyContent() {
         <h2 id="my-routes-title">Moje trasy</h2>
         <p className="note">
           Trasa to szablon zadań. Uruchom z niej grę, gdy chcesz zagrać z klasą. Z jednej trasy
-          możesz uruchomić wiele gier, każdą z własnym kodem i rankingiem.
+          możesz uruchomić wiele gier, każdą z własnym kodem i rankingiem. Trasę możesz też
+          udostępnić innym w bibliotece.
         </p>
         {templates === null && !error && <p role="status">Wczytuję…</p>}
         {templates !== null && templates.length === 0 && (
-          <p>Nie masz jeszcze żadnych tras. Utwórz pierwszą.</p>
+          <p>Nie masz jeszcze żadnych tras. Utwórz pierwszą albo skopiuj gotową z biblioteki.</p>
         )}
         {templates !== null && templates.length > 0 && (
           <ul className="route-list">
-            {templates.map((t) => (
-              <li key={t.id} className="card route-item">
-                <h3>{t.title}</h3>
-                <p className="note">
-                  {t.points} {plural(t.points, 'punkt', 'punkty', 'punktów')} · {t.games}{' '}
-                  {plural(t.games, 'gra', 'gry', 'gier')} · zmieniona{' '}
-                  {new Date(t.updated_at).toLocaleDateString('pl-PL')}
-                </p>
-                <div className="row">
-                  <button type="button" disabled={busyId === t.id} onClick={() => void launch(t)}>
-                    {busyId === t.id ? 'Chwileczkę…' : 'Uruchom grę'}
-                  </button>
-                  <Link className="btn-link" to={`/edytor/${t.id}`}>
-                    Edytuj
-                  </Link>
-                  <button type="button" disabled={busyId === t.id} onClick={() => void remove(t)}>
-                    Usuń
-                  </button>
-                </div>
-              </li>
-            ))}
+            {templates.map((t) => {
+              const st = statusOf(t)
+              return (
+                <li key={t.id} className="card route-item">
+                  <h3>{t.title}</h3>
+                  <p className="note">
+                    <span className={st.cls}>{st.text}</span> · {t.points}{' '}
+                    {plural(t.points, 'punkt', 'punkty', 'punktów')} · {t.games}{' '}
+                    {plural(t.games, 'gra', 'gry', 'gier')} · zmieniona{' '}
+                    {new Date(t.updated_at).toLocaleDateString('pl-PL')}
+                  </p>
+                  <div className="row">
+                    <button type="button" disabled={busyId === t.id} onClick={() => void launch(t)}>
+                      {busyId === t.id ? 'Chwileczkę…' : 'Uruchom grę'}
+                    </button>
+                    <Link className="btn-link" to={`/edytor/${t.id}`}>
+                      Edytuj
+                    </Link>
+                    <button type="button" disabled={busyId === t.id} onClick={() => void remove(t)}>
+                      Usuń
+                    </button>
+                  </div>
+                  <details className="publish">
+                    <summary>Biblioteka: {st.text.toLowerCase()}</summary>
+                    <PublishForm template={t} onDone={afterPublish} onError={setError} />
+                  </details>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

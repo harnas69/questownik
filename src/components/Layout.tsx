@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 
 function titleFor(path: string): string {
   if (path.startsWith('/konto')) return 'Konto – Questownik'
+  if (path.startsWith('/biblioteka')) return 'Biblioteka tras – Questownik'
   if (path.startsWith('/edytor')) return 'Edytor tras – Questownik'
   if (path.startsWith('/gra')) return 'Gra – Questownik'
   if (path.startsWith('/ranking')) return 'Ranking – Questownik'
@@ -44,7 +45,8 @@ export default function Layout() {
           <span aria-hidden="true">📍</span> Questownik
         </Link>
         <nav aria-label="Główna nawigacja">
-          <Link to="/konto">{user ? 'Moje trasy' : 'Dla nauczyciela'}</Link>
+          <Link to="/biblioteka">Biblioteka</Link>
+          <Link to="/konto">{user ? 'Moje konto' : 'Dla nauczyciela'}</Link>
         </nav>
       </header>
       <div id="content" tabIndex={-1} ref={content}>

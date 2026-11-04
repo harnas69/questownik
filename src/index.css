@@ -383,3 +383,13 @@ button.approve:not(:disabled) { background: var(--primary); color: var(--on-prim
   color: var(--link); text-decoration: underline; font-weight: 600;
 }
 details.card summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+
+/* Biblioteka tras */
+.library-search { display: flex; flex-direction: column; gap: 8px; max-width: 520px; }
+.route-title { margin: 0; font-size: 1.25rem; }
+.publish { border-top: 1px solid var(--border); padding-top: 8px; }
+.publish summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.publish-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.publish-form label:has(input[type="checkbox"]) { display: flex; gap: 10px; align-items: flex-start; }
+.site-header { flex-wrap: wrap; }
+.site-header nav { display: flex; gap: 16px; align-items: center; }

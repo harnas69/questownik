@@ -11,6 +11,7 @@ const EditorPage = lazy(() => import('./pages/EditorPage'))
 const RankingPage = lazy(() => import('./pages/RankingPage'))
 const TeacherPage = lazy(() => import('./pages/TeacherPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
+const LibraryPage = lazy(() => import('./pages/LibraryPage'))
 
 function Loading() {
   return (
@@ -48,6 +49,14 @@ createRoot(document.getElementById('root')!).render(
             element={
               <Suspense fallback={<Loading />}>
                 <EditorPage key="edit" />
+              </Suspense>
+            }
+          />
+          <Route
+            path="/biblioteka"
+            element={
+              <Suspense fallback={<Loading />}>
+                <LibraryPage />
               </Suspense>
             }
           />
