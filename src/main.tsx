@@ -12,6 +12,9 @@ const RankingPage = lazy(() => import('./pages/RankingPage'))
 const TeacherPage = lazy(() => import('./pages/TeacherPage'))
 const AccountPage = lazy(() => import('./pages/AccountPage'))
 const LibraryPage = lazy(() => import('./pages/LibraryPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
 
 function Loading() {
   return (
@@ -21,6 +24,10 @@ function Loading() {
   )
 }
 
+function Lazy({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<Loading />}>{children}</Suspense>
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
@@ -28,55 +35,16 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<HomePage />} />
-          <Route
-            path="/konto"
-            element={
-              <Suspense fallback={<Loading />}>
-                <AccountPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/edytor"
-            element={
-              <Suspense fallback={<Loading />}>
-                <EditorPage key="new" />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/edytor/:id"
-            element={
-              <Suspense fallback={<Loading />}>
-                <EditorPage key="edit" />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/biblioteka"
-            element={
-              <Suspense fallback={<Loading />}>
-                <LibraryPage />
-              </Suspense>
-            }
-          />
+          <Route path="/konto" element={<Lazy><AccountPage /></Lazy>} />
+          <Route path="/konto/reset" element={<Lazy><ResetPasswordPage /></Lazy>} />
+          <Route path="/biblioteka" element={<Lazy><LibraryPage /></Lazy>} />
+          <Route path="/prywatnosc" element={<Lazy><PrivacyPage /></Lazy>} />
+          <Route path="/admin" element={<Lazy><AdminPage /></Lazy>} />
+          <Route path="/edytor" element={<Lazy><EditorPage key="new" /></Lazy>} />
+          <Route path="/edytor/:id" element={<Lazy><EditorPage key="edit" /></Lazy>} />
           <Route path="/gra/:code" element={<PlayPage />} />
-          <Route
-            path="/ranking/:code"
-            element={
-              <Suspense fallback={<Loading />}>
-                <RankingPage />
-              </Suspense>
-            }
-          />
-          <Route
-            path="/nauczyciel/:code"
-            element={
-              <Suspense fallback={<Loading />}>
-                <TeacherPage />
-              </Suspense>
-            }
-          />
+          <Route path="/ranking/:code" element={<Lazy><RankingPage /></Lazy>} />
+          <Route path="/nauczyciel/:code" element={<Lazy><TeacherPage /></Lazy>} />
         </Route>
       </Routes>
     </BrowserRouter>

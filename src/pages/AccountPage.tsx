@@ -2,133 +2,87 @@ import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import CopyButton from '../components/CopyButton'
+import LoginForm from '../components/LoginForm'
 import PublishForm from '../components/PublishForm'
 import {
   accountErrorMessage,
   claimRoute,
+  deleteMyAccount,
   deleteTemplate,
   launchGame,
   listGames,
   listTemplates,
 } from '../lib/accountApi'
 import type { GameItem, TemplateItem } from '../lib/accountApi'
-import {
-  authErrorMessage,
-  signInWithEmail,
-  signInWithGoogle,
-  signOutAccount,
-  signUpWithEmail,
-  useAuth,
-} from '../lib/auth'
+import { signOutAccount, useAuth } from '../lib/auth'
 import { plural } from '../lib/plural'
 import { parseTeacherLink } from '../lib/teacherLink'
 
-function LoginForm() {
-  const [mode, setMode] = useState<'in' | 'up'>('in')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+function statusOf(t: TemplateItem): { text: string; cls: string } {
+  if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
+  if (t.is_public) return { text: 'Publiczna w bibliotece', cls: 'badge near' }
+  return { text: 'Prywatna', cls: 'badge' }
+}
+
+function DeleteAccount() {
+  const navigate = useNavigate()
+  const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
+  const ok = text.trim().toLocaleUpperCase('pl-PL') === 'USUŃ'
 
-  const google = async () => {
-    setError(null)
-    try {
-      await signInWithGoogle()
-    } catch (e) {
-      console.error(e)
-      setError(authErrorMessage(e))
-    }
-  }
-
-  const submit = async (e: FormEvent) => {
+  const run = async (e: FormEvent) => {
     e.preventDefault()
+    if (!ok) return
+    if (
+      !window.confirm(
+        'To ostatnie ostrzeżenie: konto, wszystkie Twoje trasy i gry (z wynikami i zdjęciami) zostaną usunięte bezpowrotnie. Kontynuować?'
+      )
+    )
+      return
     setBusy(true)
     setError(null)
-    setInfo(null)
     try {
-      if (mode === 'in') {
-        await signInWithEmail(email, password)
-      } else {
-        const r = await signUpWithEmail(email, password)
-        if (r === 'confirm') {
-          setInfo(
-            'Jeśli ten adres nie był jeszcze używany, wysłaliśmy na niego link potwierdzający. Sprawdź pocztę (także folder spam), kliknij link i wróć tutaj.'
-          )
-        }
-      }
+      await deleteMyAccount()
+      await signOutAccount()
+      navigate('/')
     } catch (err) {
       console.error(err)
-      setError(authErrorMessage(err))
-    } finally {
+      setError(accountErrorMessage(err))
       setBusy(false)
     }
   }
 
   return (
-    <section className="card" aria-labelledby="auth-title">
-      <h2 id="auth-title">{mode === 'in' ? 'Zaloguj się' : 'Załóż konto'}</h2>
-      <button type="button" className="big secondary" onClick={() => void google()}>
-        Kontynuuj z Google
-      </button>
-      <p className="auth-or">lub e-mailem</p>
-      <form className="auth-form" onSubmit={submit}>
-        <label htmlFor="auth-email" className="field-label">
-          Adres e-mail
+    <details className="card danger-zone">
+      <summary>Usuń moje konto</summary>
+      <form className="auth-form" onSubmit={run}>
+        <p>
+          Usunięcie konta kasuje na stałe: Twoje trasy (także te opublikowane w bibliotece), gry
+          uruchomione z Twojego konta razem z wynikami drużyn i zdjęciami oraz samo konto. Nie da
+          się tego cofnąć. Najpierw pobierz wyniki (CSV) z paneli gier, które chcesz zachować.
+        </p>
+        <label htmlFor="del-confirm" className="field-label">
+          Aby potwierdzić, wpisz słowo USUŃ
         </label>
         <input
-          id="auth-email"
+          id="del-confirm"
           className="answer"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <label htmlFor="auth-pass" className="field-label">
-          Hasło (minimum 8 znaków)
-        </label>
-        <input
-          id="auth-pass"
-          className="answer"
-          type="password"
-          minLength={8}
-          autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          autoComplete="off"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
         />
         {error && (
           <p role="alert" className="bad">
             {error}
           </p>
         )}
-        {info && <p role="status">{info}</p>}
-        <button
-          type="submit"
-          className="big"
-          disabled={busy || !email.trim() || password.length < 8}
-        >
-          {busy ? 'Chwileczkę…' : mode === 'in' ? 'Zaloguj się' : 'Załóż konto'}
+        <button type="submit" disabled={!ok || busy}>
+          {busy ? 'Usuwam…' : 'Usuń konto na zawsze'}
         </button>
       </form>
-      <button
-        type="button"
-        className="link-button"
-        onClick={() => {
-          setMode(mode === 'in' ? 'up' : 'in')
-          setError(null)
-          setInfo(null)
-        }}
-      >
-        {mode === 'in' ? 'Nie masz konta? Załóż je' : 'Masz już konto? Zaloguj się'}
-      </button>
-    </section>
+    </details>
   )
-}
-
-function statusOf(t: TemplateItem): { text: string; cls: string } {
-  if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
-  if (t.is_public) return { text: 'Publiczna w bibliotece', cls: 'badge near' }
-  return { text: 'Prywatna', cls: 'badge' }
 }
 
 function MyContent() {
@@ -345,6 +299,8 @@ function MyContent() {
           </button>
         </form>
       </details>
+
+      <DeleteAccount />
     </>
   )
 }

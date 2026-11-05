@@ -143,10 +143,18 @@ export function accountErrorMessage(e: unknown): string {
   if (msg.includes('invalid author')) return 'Podaj nazwę autora (od 1 do 40 znaków).'
   if (msg.includes('invalid description')) return 'Opis może mieć najwyżej 300 znaków.'
   if (msg.includes('invalid reason')) return 'Wybierz powód zgłoszenia.'
+  if (msg.includes('publish blocked'))
+    return 'Publikowanie jest zablokowane: dwie Twoje trasy zostały ukryte po zgłoszeniach. Skontaktuj się z administratorem serwisu.'
+  if (msg.includes('hidden content'))
+    return 'Ta trasa ma taką samą treść jak trasa ukryta po zgłoszeniach, więc nie można jej opublikować.'
   if (msg.includes('hidden'))
     return 'Ta trasa jest ukryta po zgłoszeniach i nie można jej opublikować.'
   if (msg.includes('already owned')) return 'Ta trasa należy już do innego konta.'
   if (msg.includes('forbidden')) return 'Brak dostępu do tej trasy (mogła zostać wycofana).'
   if (/^(Punkt \d+:|Nieprawidłowy tytuł|Trasa musi)/.test(msg)) return msg
-  return 'Operacja nie powiodła się. Sprawdź internet i spróbuj ponownie.'
+    return 'Operacja nie powiodła się. Sprawdź internet i spróbuj ponownie.'
+}
+
+export async function deleteMyAccount(): Promise<void> {
+  await call('delete_my_account')
 }

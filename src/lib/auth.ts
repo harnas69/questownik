@@ -74,3 +74,28 @@ export function authErrorMessage(e: unknown): string {
     return 'Logowanie przez Google nie jest jeszcze włączone w Supabase.'
   return 'Nie udało się zalogować. Spróbuj ponownie.'
 }
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+    redirectTo: `${window.location.origin}/konto/reset`,
+  })
+  if (error) throw error
+}
+
+export async function updatePassword(password: string): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) throw error
+}
+
+export function passwordErrorMessage(e: unknown): string {
+  const msg = ((e as { message?: string } | null)?.message ?? '').toLowerCase()
+  if (msg.includes('different from the old'))
+    return 'Nowe hasło musi być inne niż poprzednie.'
+  if (msg.includes('at least') || msg.includes('character'))
+    return 'Hasło jest za krótkie (minimum 8 znaków).'
+  if (msg.includes('session') || msg.includes('not authenticated'))
+    return 'Link wygasł. Poproś o nowy na stronie logowania.'
+  if (msg.includes('rate limit') || msg.includes('too many'))
+    return 'Zbyt wiele prób. Odczekaj chwilę i spróbuj ponownie.'
+  return 'Nie udało się zmienić hasła. Spróbuj ponownie.'
+}

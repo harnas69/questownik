@@ -393,3 +393,12 @@ details.card summary { cursor: pointer; font-weight: 700; min-height: 44px; disp
 .publish-form label:has(input[type="checkbox"]) { display: flex; gap: 10px; align-items: flex-start; }
 .site-header { flex-wrap: wrap; }
 .site-header nav { display: flex; gap: 16px; align-items: center; }
+
+/* Stopka, strefa usuwania konta, strona prywatności */
+.site-footer { text-align: center; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
+.danger-zone { border-color: var(--bad); }
+.danger-zone summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; color: var(--bad); }
+.privacy { max-width: 720px; }
+.privacy section { margin-top: 20px; }
+.privacy h2 { margin-bottom: 8px; }
+.privacy ul { padding-left: 1.3rem; display: flex; flex-direction: column; gap: 8px; }

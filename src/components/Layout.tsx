@@ -3,8 +3,10 @@ import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 
 function titleFor(path: string): string {
-  if (path.startsWith('/konto')) return 'Konto – Questownik'
+  if (path.startsWith('/admin')) return 'Moderacja – Questownik'
+  if (path.startsWith('/prywatnosc')) return 'Prywatność – Questownik'
   if (path.startsWith('/biblioteka')) return 'Biblioteka tras – Questownik'
+  if (path.startsWith('/konto')) return 'Konto – Questownik'
   if (path.startsWith('/edytor')) return 'Edytor tras – Questownik'
   if (path.startsWith('/gra')) return 'Gra – Questownik'
   if (path.startsWith('/ranking')) return 'Ranking – Questownik'
@@ -52,6 +54,9 @@ export default function Layout() {
       <div id="content" tabIndex={-1} ref={content}>
         <Outlet />
       </div>
+      <footer className="site-footer">
+        <Link to="/prywatnosc">Prywatność</Link>
+      </footer>
     </>
   )
 }
