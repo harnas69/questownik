@@ -35,6 +35,7 @@ async function fetchRoute(code: string): Promise<GameRoute> {
       content: { prompt: '', ...p.content },
       score: p.score,
       hint: p.hint,
+      unlock: p.unlock === 'qr' ? 'qr' : 'gps',
     })),
   }
 }

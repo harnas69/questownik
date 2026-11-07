@@ -402,3 +402,25 @@ details.card summary { cursor: pointer; font-weight: 700; min-height: 44px; disp
 .privacy section { margin-top: 20px; }
 .privacy h2 { margin-bottom: 8px; }
 .privacy ul { padding-left: 1.3rem; display: flex; flex-direction: column; gap: 8px; }
+
+/* Skaner i arkusz kodów QR */
+.scanner { display: flex; flex-direction: column; gap: 8px; }
+.scanner video {
+  width: 100%; max-height: 50vh; object-fit: cover; background: #000;
+  border: 2px solid var(--border); border-radius: var(--radius);
+}
+.qr-grid { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.qr-card {
+  border: 2px solid var(--border); border-radius: var(--radius); padding: 12px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+}
+.qr-card h2 { margin: 0; }
+.qr-card img { background: #fff; border-radius: 8px; max-width: 100%; height: auto; }
+.qr-text { font-size: 1.2rem; }
+
+@media print {
+  .site-header, .site-footer, .offline, .skip, .no-print { display: none !important; }
+  body { background: #fff; color: #000; }
+  .qr-grid { grid-template-columns: repeat(2, 1fr); }
+  .qr-card { break-inside: avoid; border: 2px solid #000; background: #fff; color: #000; }
+}

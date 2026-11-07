@@ -9,6 +9,14 @@ export const TASK_LABELS: Record<TaskType, string> = {
   photo: 'Zdjęcie',
 }
 
+export const UNLOCK_MODES = ['gps', 'qr'] as const
+export type UnlockMode = (typeof UNLOCK_MODES)[number]
+
+export const UNLOCK_LABELS: Record<UnlockMode, string> = {
+  gps: 'GPS: dojście na miejsce',
+  qr: 'Kod QR: zeskanowanie kartki',
+}
+
 export interface TaskContent {
   prompt: string
   options?: string[]
@@ -24,6 +32,7 @@ export interface DraftPoint {
   content: TaskContent
   score: number
   hint: string
+  unlock: UnlockMode
 }
 
 export interface DraftRoute {

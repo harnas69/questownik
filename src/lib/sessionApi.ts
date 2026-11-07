@@ -141,3 +141,21 @@ export function isGameClosed(e: unknown): boolean {
   const msg = (e as { message?: string } | null)?.message ?? ''
   return msg.includes('game closed')
 }
+
+export async function unlockPoint(sessionId: string, token: string): Promise<void> {
+  const { error } = await supabase.rpc('unlock_point', { p_session: sessionId, p_token: token })
+  if (error) throw error
+}
+
+export function isPointLocked(e: unknown): boolean {
+  const msg = (e as { message?: string } | null)?.message ?? ''
+  return msg.includes('point locked')
+}
+
+export function unlockErrorKind(e: unknown): 'wrong' | 'other' | 'closed' | 'network' {
+  const msg = (e as { message?: string } | null)?.message ?? ''
+  if (msg.includes('wrong code')) return 'wrong'
+  if (msg.includes('other point')) return 'other'
+  if (msg.includes('game closed') || msg.includes('session finished')) return 'closed'
+  return 'network'
+}

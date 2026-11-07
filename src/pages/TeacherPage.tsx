@@ -8,6 +8,7 @@ import {
   deleteRoute,
   fetchPhotoImage,
   getOverview,
+  getQrCodes,
   getResults,
   isForbidden,
   listPhotos,
@@ -46,6 +47,7 @@ function PhotoImage({
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
+
   useEffect(() => {
     let cancelled = false
     fetchPhotoImage(code, teacherKey, id)
@@ -79,6 +81,7 @@ export default function TeacherPage() {
   const [notice, setNotice] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmCode, setConfirmCode] = useState('')
+  const [qrCount, setQrCount] = useState(0)
 
   const rejectKey = useCallback(() => {
     forgetKey(code)
@@ -90,14 +93,16 @@ export default function TeacherPage() {
 
   const load = useCallback(async () => {
     try {
-      const [o, t, p] = await Promise.all([
+      const [o, t, p, q] = await Promise.all([
         getOverview(code, key),
         getResults(code, key),
         listPhotos(code, key),
+        getQrCodes(code, key),
       ])
       setOverview(o)
       setTeams(sortRanking(t))
       setPhotos(p)
+      setQrCount(q.length)
       setError(null)
     } catch (e) {
       console.error(e)
@@ -301,6 +306,19 @@ export default function TeacherPage() {
         <h2 id="h-share">Dołączanie do gry</h2>
         <GameShare code={code} />
       </section>
+
+      {qrCount > 0 && (
+        <section className="block" aria-labelledby="h-qr">
+          <h2 id="h-qr">Kody QR do wydruku</h2>
+          <p>
+            Punkty tej gry odblokowywane kodem QR: <strong>{qrCount}</strong>. Wydrukuj kody i
+            ukryj je w odpowiednich miejscach.
+          </p>
+          <Link className="btn-link" to={`/nauczyciel/${code}/qr#${key}`}>
+            Otwórz arkusz kodów QR
+          </Link>
+        </section>
+      )}
 
       <section className="block" aria-labelledby="h-results">
         <h2 id="h-results">Wyniki drużyn</h2>

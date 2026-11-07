@@ -9,6 +9,7 @@ export function newPoint(lat: number, lng: number): DraftPoint {
     content: { prompt: '' },
     score: 10,
     hint: '',
+    unlock: 'gps',
   }
 }
 

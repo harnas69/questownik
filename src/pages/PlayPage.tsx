@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import ArrivalFeedback from '../components/ArrivalFeedback'
 import FocusHeading from '../components/FocusHeading'
 import ProgressBar from '../components/ProgressBar'
+import QrUnlock from '../components/QrUnlock'
 import TaskView from '../components/TaskView'
 import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
@@ -10,11 +11,14 @@ import type { GeoPos } from '../lib/geo'
 import { plural } from '../lib/plural'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
+import { extractToken } from '../lib/qr'
 import { createSession, fetchSessionState, isGameClosed } from '../lib/sessionApi'
+import { forgetUnlocked, isUnlockedLocal, markUnlocked } from '../lib/unlockStore'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
 const PlayMap = lazy(() => import('../components/PlayMap'))
+
 function fmtTime(ms: number): string {
   const s = Math.floor(ms / 1000)
   return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
@@ -40,10 +44,27 @@ export default function PlayPage() {
   const [pos, setPos] = useState<GeoPos | null>(null)
   const [gpsError, setGpsError] = useState<string | null>(null)
   const [unlocked, setUnlocked] = useState(false)
+  const [qrUnlocked, setQrUnlocked] = useState<string | null>(null)
+  const [showHelp, setShowHelp] = useState(false)
+  // Kod z linku zeskanowanego aparatem telefonu (adres: /gra/KOD#qr=...)
+  const [pendingToken, setPendingToken] = useState<string | null>(() =>
+    extractToken(window.location.hash)
+  )
 
   const started = sessionId !== null && state !== null
 
   useWakeLock(started)
+
+  // Kod nie powinien zostawać w pasku adresu ani w historii przeglądarki
+  useEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(
+        window.history.state,
+        '',
+        window.location.pathname + window.location.search
+      )
+    }
+  }, [])
 
   // 1. Pobierz trasę i odtwórz postęp z serwera
   useEffect(() => {
@@ -135,7 +156,7 @@ export default function PlayPage() {
         setState(s)
       } catch (e) {
         console.error(e)
-                setStartError(
+        setStartError(
           isGameClosed(e)
             ? 'Ta gra została zakończona przez nauczyciela.'
             : 'Nie udało się rozpocząć gry. Sprawdź internet i spróbuj ponownie.'
@@ -196,7 +217,7 @@ export default function PlayPage() {
       ? fmtTime(Date.parse(state.finishedAt) - Date.parse(state.startedAt))
       : '—'
     return (
-       <main className="play">
+      <main className="play">
         <h1 className="sr-only">{route.title}</h1>
         <section className="card">
           <FocusHeading>Koniec trasy!</FocusHeading>
@@ -232,8 +253,10 @@ export default function PlayPage() {
   }
 
   const point = route.points[state.currentIdx]
+  const isQr = point.unlock === 'qr'
+  const qrOpen = isQr && (qrUnlocked === point.id || isUnlockedLocal(sessionId, point.id))
   const dist = pos ? distanceM(pos.lat, pos.lng, point.lat, point.lng) : null
-  const inRange = unlocked || (pos !== null && isInRange(pos, point))
+  const inRange = isQr ? qrOpen : unlocked || (pos !== null && isInRange(pos, point))
   const prox = dist !== null ? proximity(dist, point.radiusM) : null
   const shown = dist !== null ? fmtDist(dist) : null
 
@@ -247,6 +270,7 @@ export default function PlayPage() {
 
   const onNext = (r: AnswerResult) => {
     setUnlocked(false)
+    setQrUnlocked(null)
     setState((prev) =>
       prev
         ? {
@@ -260,8 +284,13 @@ export default function PlayPage() {
     )
   }
 
+  const onQrUnlocked = () => {
+    markUnlocked(sessionId, point.id)
+    setQrUnlocked(point.id)
+  }
+
   return (
-     <main className="play">
+    <main className="play">
       <h1 className="sr-only">{route.title}</h1>
       <header className="hud">
         <span className="chip">{team}</span>
@@ -280,7 +309,55 @@ export default function PlayPage() {
             total={route.points.length}
             sessionId={sessionId}
             onNext={onNext}
+            onLocked={() => {
+              forgetUnlocked(sessionId, point.id)
+              setQrUnlocked(null)
+            }}
           />
+        </>
+      ) : isQr ? (
+        <>
+          <QrUnlock
+            key={point.id}
+            sessionId={sessionId}
+            index={state.currentIdx}
+            total={route.points.length}
+            pendingToken={pendingToken}
+            onPendingConsumed={() => setPendingToken(null)}
+            onUnlocked={onQrUnlocked}
+          />
+          <section className="card">
+            <h2>Wskazówka: gdzie szukać</h2>
+            {gpsError && (
+              <p role="alert" className="bad">
+                {gpsError}
+              </p>
+            )}
+            {shown ? (
+              <p>
+                Odległość do miejsca z kodem:{' '}
+                <strong>
+                  {shown.value} {shown.unit}
+                </strong>
+              </p>
+            ) : (
+              !gpsError && <p role="status">Szukam Twojej pozycji…</p>
+            )}
+            <button type="button" aria-expanded={showHelp} onClick={() => setShowHelp((v) => !v)}>
+              {showHelp ? 'Ukryj mapę' : 'Pokaż mapę'}
+            </button>
+            {showHelp && (
+              <Suspense
+                fallback={
+                  <div className="map-wrap map-loading" role="status">
+                    Wczytuję mapę…
+                  </div>
+                }
+              >
+                <PlayMap key={point.id} target={point} pos={pos} />
+              </Suspense>
+            )}
+          </section>
         </>
       ) : (
         <section className="card">
@@ -310,7 +387,7 @@ export default function PlayPage() {
             </div>
           )}
 
-                    <Suspense
+          <Suspense
             fallback={
               <div className="map-wrap map-loading" role="status">
                 Wczytuję mapę…

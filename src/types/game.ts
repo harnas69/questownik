@@ -9,6 +9,7 @@ export interface GamePoint {
   content: TaskContent
   score: number
   hint: string | null
+  unlock: 'gps' | 'qr'
 }
 
 export interface GameRoute {

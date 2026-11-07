@@ -15,6 +15,7 @@ const LibraryPage = lazy(() => import('./pages/LibraryPage'))
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
 const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const QrSheetPage = lazy(() => import('./pages/QrSheetPage'))
 
 function Loading() {
   return (
@@ -45,6 +46,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/gra/:code" element={<PlayPage />} />
           <Route path="/ranking/:code" element={<Lazy><RankingPage /></Lazy>} />
           <Route path="/nauczyciel/:code" element={<Lazy><TeacherPage /></Lazy>} />
+          <Route path="/nauczyciel/:code/qr" element={<Lazy><QrSheetPage /></Lazy>} />
         </Route>
       </Routes>
     </BrowserRouter>

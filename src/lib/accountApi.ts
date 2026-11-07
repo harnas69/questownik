@@ -60,8 +60,12 @@ export async function listGames(): Promise<GameItem[]> {
   return (await call<GameItem[] | null>('my_games')) ?? []
 }
 
-export function getTemplate(id: string): Promise<TemplateData> {
-  return call<TemplateData>('get_template', { p_id: id })
+export async function getTemplate(id: string): Promise<TemplateData> {
+  const t = await call<TemplateData>('get_template', { p_id: id })
+  return {
+    ...t,
+    points: t.points.map((p) => ({ ...p, unlock: p.unlock === 'qr' ? 'qr' : 'gps' })),
+  }
 }
 
 export function saveTemplate(

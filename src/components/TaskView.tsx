@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import type { AnswerResult, GamePoint } from '../types/game'
-import { isGameClosed, submitAnswer, submitPhoto } from '../lib/sessionApi'
+import { isGameClosed, isPointLocked, submitAnswer, submitPhoto } from '../lib/sessionApi'
 import { resizeToJpeg } from '../lib/image'
 import FocusHeading from './FocusHeading'
 
@@ -11,9 +11,10 @@ interface Props {
   total: number
   sessionId: string
   onNext: (result: AnswerResult) => void
+  onLocked?: () => void
 }
 
-export default function TaskView({ point, index, total, sessionId, onNext }: Props) {
+export default function TaskView({ point, index, total, sessionId, onNext, onLocked }: Props) {
   const [text, setText] = useState('')
   const [choice, setChoice] = useState<number | null>(null)
   const [attempts, setAttempts] = useState(0)
@@ -83,6 +84,7 @@ export default function TaskView({ point, index, total, sessionId, onNext }: Pro
     } catch (e) {
       console.error(e)
       if (isGameClosed(e)) setClosed(true)
+      else if (isPointLocked(e) && onLocked) onLocked()
       else setNetError(true)
     } finally {
       setBusy(false)

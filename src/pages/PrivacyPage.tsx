@@ -53,6 +53,11 @@ export default function PrivacyPage() {
             (aby gra działała po odświeżeniu strony i przy słabym zasięgu). Nie używamy plików
             cookie reklamowych ani narzędzi analitycznych.
           </li>
+          <li>
+            Aparat jest używany tylko do skanowania kodów QR oraz do zdjęć w zadaniach ze
+            zdjęciem. Obraz z aparatu przy skanowaniu kodów nie jest nigdzie zapisywany ani
+            wysyłany.
+          </li>
         </ul>
       </section>
 

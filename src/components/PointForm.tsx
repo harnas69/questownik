@@ -1,5 +1,5 @@
-import { TASK_LABELS, TASK_TYPES } from '../types/route'
-import type { DraftPoint, TaskContent, TaskType } from '../types/route'
+import { TASK_LABELS, TASK_TYPES, UNLOCK_LABELS, UNLOCK_MODES } from '../types/route'
+import type { DraftPoint, TaskContent, TaskType, UnlockMode } from '../types/route'
 import { contentFor } from '../lib/points'
 
 interface Props {
@@ -99,16 +99,38 @@ export default function PointForm({
       )}
 
       <label>
-        Promień aktywacji: {point.radiusM} m
-        <input
-          type="range"
-          min={20}
-          max={200}
-          step={5}
-          value={point.radiusM}
-          onChange={(e) => onChange({ radiusM: Number(e.target.value) })}
-        />
+        Sposób odblokowania zadania
+        <select
+          value={point.unlock}
+          onChange={(e) => onChange({ unlock: e.target.value as UnlockMode })}
+        >
+          {UNLOCK_MODES.map((m) => (
+            <option key={m} value={m}>
+              {UNLOCK_LABELS[m]}
+            </option>
+          ))}
+        </select>
       </label>
+
+      {point.unlock === 'gps' ? (
+        <label>
+          Promień aktywacji: {point.radiusM} m
+          <input
+            type="range"
+            min={20}
+            max={200}
+            step={5}
+            value={point.radiusM}
+            onChange={(e) => onChange({ radiusM: Number(e.target.value) })}
+          />
+        </label>
+      ) : (
+        <p className="note">
+          Zadanie odblokuje się dopiero po zeskanowaniu kodu QR. Kody wydrukujesz w panelu gry po
+          jej uruchomieniu. Pozycja punktu na mapie służy graczom tylko jako wskazówka, gdzie
+          szukać kodu.
+        </p>
+      )}
 
       <label>
         Punkty do zdobycia

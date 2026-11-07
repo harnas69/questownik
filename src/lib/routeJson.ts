@@ -58,6 +58,7 @@ function parsePoint(raw: unknown, n: number): DraftPoint {
     content,
     score: num(raw.score, 0, 1000, 'score', n),
     hint: typeof raw.hint === 'string' ? raw.hint : '',
+    unlock: raw.unlock === 'qr' ? 'qr' : 'gps',
   }
 }
 

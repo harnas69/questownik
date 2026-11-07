@@ -87,3 +87,11 @@ export async function deleteRoute(code: string, key: string): Promise<void> {
   await call('teacher_delete_route', { p_code: code, p_key: key })
 }
 
+export interface QrCodeItem {
+  position: number
+  token: string
+}
+
+export async function getQrCodes(code: string, key: string): Promise<QrCodeItem[]> {
+  return (await call<QrCodeItem[] | null>('teacher_qr_codes', { p_code: code, p_key: key })) ?? []
+}

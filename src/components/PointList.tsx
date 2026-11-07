@@ -34,6 +34,7 @@ export default function PointList({ points, selected, onSelect }: Props) {
               <span className="pl-body">
                 <span className="pl-type">
                   Punkt {i + 1}: {TASK_LABELS[p.taskType]}
+                  {p.unlock === 'qr' ? ' · kod QR' : ''}
                 </span>
                 <span className="pl-text">{text || 'Brak treści zadania'}</span>
               </span>
