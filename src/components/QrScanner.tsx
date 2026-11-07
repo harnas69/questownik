@@ -35,7 +35,11 @@ export default function QrScanner({ onResult, onClose }: Props) {
       }
       try {
         const s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
           audio: false,
         })
         if (cancelled) {
@@ -43,6 +47,20 @@ export default function QrScanner({ onResult, onClose }: Props) {
           return
         }
         stream = s
+
+        // Ciągła ostrość tam, gdzie przeglądarka na to pozwala (na iPhonie ostrość jest automatyczna)
+        try {
+          const track = s.getVideoTracks()[0]
+          const caps = (track.getCapabilities?.() ?? {}) as { focusMode?: string[] }
+          if (caps.focusMode?.includes('continuous')) {
+            await track.applyConstraints({
+              advanced: [{ focusMode: 'continuous' }],
+            } as unknown as MediaTrackConstraints)
+          }
+        } catch {
+          // nieobsługiwane: skaner działa bez tego
+        }
+
         const video = videoRef.current
         if (!video) return
         video.srcObject = s
@@ -55,7 +73,7 @@ export default function QrScanner({ onResult, onClose }: Props) {
             const canvas = canvasRef.current
             const ctx = canvas?.getContext('2d', { willReadFrequently: true })
             if (canvas && ctx) {
-              const w = Math.min(video.videoWidth, 640)
+              const w = Math.min(video.videoWidth, 800)
               const h = Math.round(video.videoHeight * (w / video.videoWidth))
               canvas.width = w
               canvas.height = h
@@ -95,9 +113,12 @@ export default function QrScanner({ onResult, onClose }: Props) {
         </p>
       ) : (
         <>
-          <video ref={videoRef} playsInline muted aria-label="Podgląd z aparatu" />
+          <div className="scan-view">
+            <video ref={videoRef} playsInline muted autoPlay aria-label="Podgląd z aparatu" />
+            <div className="scan-frame" aria-hidden="true" />
+          </div>
           <p className="note" role="status">
-            Skieruj aparat na kod QR i trzymaj chwilę nieruchomo.
+            Ustaw kod QR w ramce i trzymaj telefon chwilę nieruchomo.
           </p>
         </>
       )}
