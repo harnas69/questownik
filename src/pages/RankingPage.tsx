@@ -4,6 +4,7 @@ import { fetchSessions, loadRouteInfo, subscribeSessions } from '../lib/sessionA
 import type { RouteInfo } from '../lib/sessionApi'
 import { durationMs, sortRanking } from '../lib/ranking'
 import type { SessionRow } from '../lib/ranking'
+import { PageSkeleton } from '../components/Skeleton'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
@@ -60,13 +61,7 @@ export default function RankingPage() {
       </main>
     )
   }
-  if (!info) {
-    return (
-      <main className="play">
-        <p role="status">Wczytuję ranking…</p>
-      </main>
-    )
-  }
+  if (!info) return <PageSkeleton label="Wczytuję ranking…" />
 
   return (
     <main className={projector ? 'ranking projector' : 'ranking'}>

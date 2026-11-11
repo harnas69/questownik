@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { passwordErrorMessage, updatePassword, useAuth } from '../lib/auth'
+import { PageSkeleton } from '../components/Skeleton'
 
 export default function ResetPasswordPage() {
   const { user, loading } = useAuth()
@@ -30,13 +31,7 @@ export default function ResetPasswordPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <main className="play">
-        <p role="status">Sprawdzam link…</p>
-      </main>
-    )
-  }
+  if (loading) return <PageSkeleton label="Sprawdzam link…" />
 
   if (!user) {
     return (

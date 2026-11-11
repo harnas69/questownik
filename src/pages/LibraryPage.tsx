@@ -12,6 +12,7 @@ import type { LibraryItem, LibrarySort } from '../lib/accountApi'
 import { useAuth } from '../lib/auth'
 import { summarizeTypes } from '../lib/library'
 import { plural } from '../lib/plural'
+import { BlockSkeleton } from '../components/Skeleton'
 
 const PAGE = 20
 
@@ -180,7 +181,7 @@ export default function LibraryPage() {
         {notice?.editId && <Link to={`/edytor/${notice.editId}`}>Edytuj kopię</Link>}
       </p>
 
-      {items === null && !error && <p role="status">Wczytuję…</p>}
+      {items === null && !error && <BlockSkeleton rows={3} label="Wczytuję bibliotekę…" />}
 
       {items !== null && (
         <p role="status" className="note">

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
+import ThemeToggle from './ThemeToggle'
 
 function titleFor(path: string): string {
   if (path.startsWith('/admin')) return 'Moderacja – Questownik'
@@ -49,6 +50,7 @@ export default function Layout() {
         <nav aria-label="Główna nawigacja">
           <Link to="/biblioteka">Biblioteka</Link>
           <Link to="/konto">{user ? 'Moje konto' : 'Dla nauczyciela'}</Link>
+          <ThemeToggle />
         </nav>
       </header>
       <div id="content" tabIndex={-1} ref={content}>

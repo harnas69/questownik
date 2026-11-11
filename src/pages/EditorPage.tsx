@@ -11,6 +11,7 @@ import { moveItem, newPoint, validatePoints } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
 import { isForbidden } from '../lib/teacherApi'
 import type { DraftPoint } from '../types/route'
+import { PageSkeleton } from '../components/Skeleton'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMPTY = JSON.stringify({ title: '', points: [], allowManual: false })
@@ -215,13 +216,7 @@ export default function EditorPage() {
   }
 
   // ---- Logowanie i wczytywanie ----
-  if (auth.loading) {
-    return (
-      <main className="play">
-        <p role="status">Sprawdzam logowanie…</p>
-      </main>
-    )
-  }
+  if (auth.loading) return <PageSkeleton label="Sprawdzam logowanie…" />
 
   if (!auth.user) {
     return (
@@ -240,13 +235,7 @@ export default function EditorPage() {
     )
   }
 
-  if (editing && loadState === 'loading') {
-    return (
-      <main className="play">
-        <p role="status">Wczytuję trasę do edycji…</p>
-      </main>
-    )
-  }
+  if (editing && loadState === 'loading') return <PageSkeleton label="Wczytuję trasę do edycji…" />
 
   if (editing && loadState === 'denied') {
     return (

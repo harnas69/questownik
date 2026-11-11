@@ -20,6 +20,8 @@ import type { Overview, PhotoItem, TeamResult } from '../lib/teacherApi'
 import { TASK_LABELS } from '../types/route'
 import { forgetKey, readKey, storeKey } from '../lib/teacherKey'
 import GameShare from '../components/GameShare'
+import { useConfirm } from '../lib/confirm'
+import { BlockSkeleton } from '../components/Skeleton'
 
 
 function fmt(ms: number): string {
@@ -63,14 +65,14 @@ function PhotoImage({
   }, [code, teacherKey, id])
 
   if (failed) return <p className="bad">Nie udało się wczytać zdjęcia.</p>
-  if (!src) return <p role="status">Wczytuję zdjęcie…</p>
+  if (!src) return <div className="skeleton sk-photo" role="status" aria-label="Wczytuję zdjęcie" />
   return <img className="photo-preview" src={src} alt={alt} />
 }
 
 export default function TeacherPage() {
   const code = (useParams().code ?? '').toUpperCase()
   const navigate = useNavigate()
-
+  const askConfirm = useConfirm()
   const [key, setKey] = useState(() => readKey(code))
   const [keyInput, setKeyInput] = useState('')
   const [overview, setOverview] = useState<Overview | null>(null)
@@ -162,7 +164,14 @@ export default function TeacherPage() {
   }
 
   const removeReviewed = async () => {
-    if (!window.confirm('Usunąć zatwierdzone i odrzucone zdjęcia? Nie da się tego cofnąć.')) return
+    const ok = await askConfirm({
+      title: 'Usunąć sprawdzone zdjęcia?',
+      message:
+        'Zatwierdzone i odrzucone zdjęcia zostaną usunięte. Punkty drużyn zostają. Nie da się tego cofnąć.',
+      confirmLabel: 'Usuń zdjęcia',
+      danger: true,
+    })
+    if (!ok) return
     await guard(async () => {
       await deleteReviewed(code, key)
       await load()
@@ -173,13 +182,15 @@ export default function TeacherPage() {
   const toggleClosed = async () => {
     if (!overview) return
     const closing = !overview.closed
-    if (
-      closing &&
-      !window.confirm(
-        'Zakończyć grę? Nowe drużyny nie wystartują, a obecne nie przejdą do kolejnych punktów. Wyniki zostaną, a grę można wznowić.'
-      )
-    )
-      return
+    if (closing) {
+      const ok = await askConfirm({
+        title: 'Zakończyć grę?',
+        message:
+          'Nowe drużyny nie wystartują, a obecne nie przejdą do kolejnych punktów. Wyniki zostaną, a grę można wznowić.',
+        confirmLabel: 'Zakończ grę',
+      })
+      if (!ok) return
+    }
     await guard(async () => {
       await setClosed(code, key, closing)
       await load()
@@ -188,12 +199,14 @@ export default function TeacherPage() {
   }
 
   const reset = async () => {
-    if (
-      !window.confirm(
-        'Wyczyścić wyniki wszystkich drużyn i zdjęcia? Trasa zostanie, a gracze zaczną od nowa. Nie da się tego cofnąć.'
-      )
-    )
-      return
+    const ok = await askConfirm({
+      title: 'Wyczyścić wyniki?',
+      message:
+        'Wyniki wszystkich drużyn i zdjęcia zostaną usunięte. Trasa zostanie, a gracze zaczną od nowa. Nie da się tego cofnąć.',
+      confirmLabel: 'Wyczyść wyniki',
+      danger: true,
+    })
+    if (!ok) return
     await guard(async () => {
       const n = await resetSessions(code, key)
       await load()
@@ -253,7 +266,7 @@ export default function TeacherPage() {
             {error}
           </p>
         ) : (
-          <p role="status">Wczytuję…</p>
+          <BlockSkeleton rows={3} label="Wczytuję panel gry…" />
         )}
       </main>
     )

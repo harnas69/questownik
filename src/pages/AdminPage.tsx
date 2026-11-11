@@ -3,10 +3,13 @@ import { Link } from 'react-router-dom'
 import { adminDeleteTemplate, amIAdmin, listReports, setHidden } from '../lib/adminApi'
 import type { AdminReport } from '../lib/adminApi'
 import { useAuth } from '../lib/auth'
+import { useConfirm } from '../lib/confirm'
+import { BlockSkeleton, PageSkeleton } from '../components/Skeleton'
 
 export default function AdminPage() {
   const { user, loading } = useAuth()
   const uid = user?.id
+  const askConfirm = useConfirm()
 
   const [admin, setAdmin] = useState<boolean | null>(null)
   const [reports, setReports] = useState<AdminReport[] | null>(null)
@@ -45,7 +48,14 @@ export default function AdminPage() {
 
   const toggleHidden = async (r: AdminReport) => {
     const hide = !r.hidden
-    if (!hide && !window.confirm('Przywrócić trasę? Zgłoszenia dotyczące niej zostaną wyczyszczone.')) return
+      if (!hide) {
+      const ok = await askConfirm({
+        title: 'Przywrócić trasę?',
+        message: 'Zgłoszenia dotyczące tej trasy zostaną wyczyszczone.',
+        confirmLabel: 'Przywróć',
+      })
+      if (!ok) return
+    }
     setBusyId(r.id)
     setError(null)
     try {
@@ -61,7 +71,13 @@ export default function AdminPage() {
   }
 
   const remove = async (r: AdminReport) => {
-    if (!window.confirm(`Usunąć trasę „${r.title}” na stałe? Nie da się tego cofnąć.`)) return
+    const ok = await askConfirm({
+      title: `Usunąć trasę „${r.title}”?`,
+      message: 'Trasa zostanie usunięta na stałe. Nie da się tego cofnąć.',
+      confirmLabel: 'Usuń na stałe',
+      danger: true,
+    })
+    if (!ok) return
     setBusyId(r.id)
     setError(null)
     try {
@@ -76,13 +92,7 @@ export default function AdminPage() {
     }
   }
 
-  if (loading || (user && admin === null)) {
-    return (
-      <main className="play">
-        <p role="status">Sprawdzam uprawnienia…</p>
-      </main>
-    )
-  }
+  if (loading || (user && admin === null)) return <PageSkeleton label="Sprawdzam uprawnienia…" />
 
   if (!user || admin !== true) {
     return (
@@ -113,7 +123,7 @@ export default function AdminPage() {
         {notice}
       </p>
 
-      {reports === null && !error && <p role="status">Wczytuję…</p>}
+      {reports === null && !error && <BlockSkeleton rows={3} label="Wczytuję zgłoszenia…" />}
       {reports !== null && reports.length === 0 && <p>Brak zgłoszeń.</p>}
 
       {reports !== null && reports.length > 0 && (

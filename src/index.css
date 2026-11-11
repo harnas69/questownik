@@ -454,3 +454,101 @@ details.card summary { cursor: pointer; font-weight: 700; min-height: 44px; disp
   box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.35);
   pointer-events: none;
 }
+
+/* ===== motyw ręczny, przyciski, okna, szkielety, strona główna ===== */
+
+:root { --on-bad: #fff; }
+@media (prefers-color-scheme: dark) {
+  :root { --on-bad: #111; }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #fffdf5; --surface: #ffffff; --surface-2: #f4f1e6;
+  --text: #1a1a1a; --muted: #4a4f57; --border: #c9ccd1;
+  --primary: #ffd43b; --on-primary: #111111; --link: #1864ab;
+  --good: #237a35; --bad: #c92a2a; --on-bad: #ffffff; --focus: #1864ab;
+  --shadow: 0 2px 8px rgb(0 0 0 / 0.08);
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #14161a; --surface: #1e2127; --surface-2: #272b33;
+  --text: #f1f3f5; --muted: #b4bbc4; --border: #434a54;
+  --primary: #ffd43b; --on-primary: #111111; --link: #74c0fc;
+  --good: #69db7c; --bad: #ff8787; --on-bad: #111111; --focus: #74c0fc;
+  --shadow: none;
+}
+
+.offline { background: var(--bad); color: var(--on-bad); }
+
+/* Przyciski: spójna hierarchia */
+button, .btn-link { transition: background-color 0.15s, transform 0.05s; }
+button:not(:disabled):hover, .btn-link:hover { background: var(--surface-2); }
+button:not(:disabled):active, .btn-link:active { transform: translateY(1px); }
+button.primary { background: var(--primary); color: var(--on-primary); border-color: var(--on-primary); }
+button.primary:not(:disabled):hover { background: var(--primary); filter: brightness(0.94); }
+button.danger { color: var(--bad); border-color: var(--bad); }
+button.danger.solid { background: var(--bad); color: var(--on-bad); }
+button.danger.solid:not(:disabled):hover { background: var(--bad); filter: brightness(0.92); }
+button.big:not(:disabled):hover, a.big:hover { background: var(--primary); filter: brightness(0.94); }
+button.big.secondary:not(:disabled):hover, a.big.secondary:hover { background: var(--surface-2); filter: none; }
+
+/* Przełącznik motywu w nagłówku */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: transparent; color: var(--on-primary); border-color: var(--on-primary);
+  padding: 6px 12px; font-size: 0.95rem;
+}
+.theme-toggle:not(:disabled):hover { background: rgb(0 0 0 / 0.12); }
+.theme-toggle:focus-visible { outline-color: #111; }
+@media (max-width: 420px) { .theme-text { display: none; } }
+
+/* Okna potwierdzeń */
+.dialog {
+  border: 2px solid var(--text); border-radius: var(--radius); padding: 0;
+  width: min(92vw, 460px); background: var(--surface); color: var(--text);
+  box-shadow: 0 10px 40px rgb(0 0 0 / 0.35);
+}
+.dialog::backdrop { background: rgb(0 0 0 / 0.55); }
+.dialog-body { display: flex; flex-direction: column; gap: 12px; padding: 20px; }
+.dialog-body h2 { margin: 0; }
+.dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.dialog-actions button { flex: 1 1 140px; }
+
+/* Szkielety ładowania */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: var(--radius);
+}
+.sk-title { height: 2rem; width: 60%; }
+.sk-card { height: 120px; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+/* Strona główna */
+.home { max-width: 720px; }
+.home .hero h1 { font-size: 2.6rem; }
+.eyebrow {
+  align-self: center; background: var(--surface-2); border: 2px solid var(--border);
+  border-radius: 999px; padding: 2px 14px; font-weight: 700; font-size: 0.9rem;
+}
+.join-card { border-color: var(--text); }
+.steps-grid {
+  list-style: none; margin: 0; padding: 0; counter-reset: step;
+  display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.steps-grid li { counter-increment: step; display: flex; gap: 12px; align-items: flex-start; }
+.steps-grid li::before {
+  content: counter(step); flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%;
+  background: var(--primary); color: var(--on-primary);
+  display: grid; place-items: center; font-weight: 800;
+}
+.cta-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.cta-card { color: var(--text); text-decoration: none; }
+.cta-card:hover { border-color: var(--text); }
+.cta-card strong { font-size: 1.15rem; }
+.cta-card span { color: var(--muted); }
+
+.sk-stack { display: flex; flex-direction: column; gap: 12px; }
+.sk-photo { height: 220px; }

@@ -5,6 +5,7 @@ import { formatToken } from '../lib/qr'
 import { getQrCodes, isForbidden } from '../lib/teacherApi'
 import type { QrCodeItem } from '../lib/teacherApi'
 import { readKey } from '../lib/teacherKey'
+import { BlockSkeleton } from '../components/Skeleton'
 
 export default function QrSheetPage() {
   const code = (useParams().code ?? '').toUpperCase()
@@ -72,7 +73,7 @@ export default function QrSheetPage() {
           {error}
         </p>
       )}
-      {items === null && !error && <p role="status">Wczytuję…</p>}
+      {items === null && !error && <BlockSkeleton rows={2} label="Wczytuję kody…" />}
       {items !== null && items.length === 0 && (
         <p>Ta gra nie ma punktów odblokowywanych kodem QR.</p>
       )}

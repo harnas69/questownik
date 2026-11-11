@@ -16,6 +16,7 @@ import { createSession, fetchSessionState, isGameClosed } from '../lib/sessionAp
 import { forgetUnlocked, isUnlockedLocal, markUnlocked } from '../lib/unlockStore'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
+import { PageSkeleton } from '../components/Skeleton'
 
 const PlayMap = lazy(() => import('../components/PlayMap'))
 
@@ -125,13 +126,7 @@ export default function PlayPage() {
       </main>
     )
   }
-  if (!route) {
-    return (
-      <main className="play">
-        <p role="status">Wczytuję trasę…</p>
-      </main>
-    )
-  }
+  if (!route) return <PageSkeleton label="Wczytuję trasę…" />
   if (route.points.length === 0) {
     return (
       <main className="play">

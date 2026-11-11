@@ -17,6 +17,8 @@ import type { GameItem, TemplateItem } from '../lib/accountApi'
 import { signOutAccount, useAuth } from '../lib/auth'
 import { plural } from '../lib/plural'
 import { parseTeacherLink } from '../lib/teacherLink'
+import { useConfirm } from '../lib/confirm'
+import { BlockSkeleton, PageSkeleton } from '../components/Skeleton'
 
 function statusOf(t: TemplateItem): { text: string; cls: string } {
   if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
@@ -26,6 +28,7 @@ function statusOf(t: TemplateItem): { text: string; cls: string } {
 
 function DeleteAccount() {
   const navigate = useNavigate()
+  const askConfirm = useConfirm()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,12 +37,14 @@ function DeleteAccount() {
   const run = async (e: FormEvent) => {
     e.preventDefault()
     if (!ok) return
-    if (
-      !window.confirm(
-        'To ostatnie ostrzeżenie: konto, wszystkie Twoje trasy i gry (z wynikami i zdjęciami) zostaną usunięte bezpowrotnie. Kontynuować?'
-      )
-    )
-      return
+    const sure = await askConfirm({
+      title: 'Usunąć konto na zawsze?',
+      message:
+        'Konto, wszystkie Twoje trasy i gry (z wynikami i zdjęciami) zostaną usunięte bezpowrotnie.',
+      confirmLabel: 'Usuń konto',
+      danger: true,
+    })
+    if (!sure) return
     setBusy(true)
     setError(null)
     try {
@@ -87,6 +92,7 @@ function DeleteAccount() {
 
 function MyContent() {
   const navigate = useNavigate()
+  const askConfirm = useConfirm()
   const [templates, setTemplates] = useState<TemplateItem[] | null>(null)
   const [games, setGames] = useState<GameItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -141,7 +147,13 @@ function MyContent() {
     const extra =
       t.games > 0 ? ` Uruchomione z niej gry (${t.games}) zostaną i nadal będą działać.` : ''
     const pub = t.is_public ? ' Zniknie też z biblioteki.' : ''
-    if (!window.confirm(`Usunąć trasę „${t.title}”?${extra}${pub} Nie da się tego cofnąć.`)) return
+    const ok = await askConfirm({
+      title: `Usunąć trasę „${t.title}”?`,
+      message: `${extra}${pub} Nie da się tego cofnąć.`.trim(),
+      confirmLabel: 'Usuń trasę',
+      danger: true,
+    })
+    if (!ok) return
     setBusyId(t.id)
     setError(null)
     try {
@@ -210,7 +222,7 @@ function MyContent() {
           możesz uruchomić wiele gier, każdą z własnym kodem i rankingiem. Trasę możesz też
           udostępnić innym w bibliotece.
         </p>
-        {templates === null && !error && <p role="status">Wczytuję…</p>}
+        {templates === null && !error && <BlockSkeleton label="Wczytuję trasy…" />}
         {templates !== null && templates.length === 0 && (
           <p>Nie masz jeszcze żadnych tras. Utwórz pierwszą albo skopiuj gotową z biblioteki.</p>
         )}
@@ -251,7 +263,7 @@ function MyContent() {
 
       <section aria-labelledby="my-games-title" className="block">
         <h2 id="my-games-title">Moje gry</h2>
-        {games === null && !error && <p role="status">Wczytuję…</p>}
+        {games === null && !error && <BlockSkeleton label="Wczytuję gry…" />}
         {games !== null && games.length === 0 && (
           <p>Nie prowadzisz jeszcze żadnej gry. Uruchom ją z jednej ze swoich tras.</p>
         )}
@@ -308,13 +320,7 @@ function MyContent() {
 export default function AccountPage() {
   const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <main className="play">
-        <p role="status">Sprawdzam logowanie…</p>
-      </main>
-    )
-  }
+  if (loading) return <PageSkeleton label="Sprawdzam logowanie…" />
 
   if (!user) {
     return (
