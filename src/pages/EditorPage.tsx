@@ -5,13 +5,16 @@ import type { Map as LeafletMap } from 'leaflet'
 import MapView from '../components/MapView'
 import PointForm from '../components/PointForm'
 import PointList from '../components/PointList'
+import PointSheet from '../components/PointSheet'
+import { PageSkeleton } from '../components/Skeleton'
 import { accountErrorMessage, getTemplate, launchGame, saveTemplate } from '../lib/accountApi'
 import { useAuth } from '../lib/auth'
+import { useConfirm } from '../lib/confirm'
 import { moveItem, newPoint, validatePoints } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
 import { isForbidden } from '../lib/teacherApi'
+import { useMediaQuery } from '../lib/useMediaQuery'
 import type { DraftPoint } from '../types/route'
-import { PageSkeleton } from '../components/Skeleton'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMPTY = JSON.stringify({ title: '', points: [], allowManual: false })
@@ -22,6 +25,8 @@ export default function EditorPage() {
   const { id: editParam } = useParams()
   const navigate = useNavigate()
   const auth = useAuth()
+  const askConfirm = useConfirm()
+  const isMobile = useMediaQuery('(max-width: 800px)')
   const uid = auth.user?.id
 
   const editing = editParam !== undefined
@@ -37,6 +42,7 @@ export default function EditorPage() {
   const [title, setTitle] = useState('')
   const [points, setPoints] = useState<DraftPoint[]>([])
   const [selected, setSelected] = useState<number | null>(null)
+  const [sheetOpen, setSheetOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [launching, setLaunching] = useState(false)
@@ -90,6 +96,7 @@ export default function EditorPage() {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
     setSelected(countRef.current)
     countRef.current += 1
+    setSheetOpen(false)
   }
 
   const addAtCenter = () => {
@@ -120,8 +127,10 @@ export default function EditorPage() {
     )
   }
 
-  const patchPoint = (i: number, patch: Partial<DraftPoint>) =>
+  const patchPoint = (i: number, patch: Partial<DraftPoint>) => {
+    setError(null)
     setPoints((prev) => prev.map((p, j) => (j === i ? { ...p, ...patch } : p)))
+  }
 
   const moveSelectedToCenter = () => {
     const c = mapRef.current?.getCenter()
@@ -133,9 +142,27 @@ export default function EditorPage() {
     setSelected(to)
   }
 
-  const remove = (i: number) => {
+  const remove = async (i: number) => {
+    const ok = await askConfirm({
+      title: `Usunąć punkt ${i + 1}?`,
+      message: 'Treść zadania tego punktu zostanie utracona.',
+      confirmLabel: 'Usuń punkt',
+      danger: true,
+    })
+    if (!ok) return
     setPoints((prev) => prev.filter((_, j) => j !== i))
     setSelected(null)
+    setSheetOpen(false)
+  }
+
+  const selectFromList = (i: number) => {
+    setSelected(i)
+    setSheetOpen(true)
+  }
+
+  const selectFromMap = (i: number) => {
+    setSelected(i)
+    setSheetOpen(false)
   }
 
   const startNew = () => {
@@ -146,6 +173,7 @@ export default function EditorPage() {
     setTitle('')
     setPoints([])
     setSelected(null)
+    setSheetOpen(false)
     setAllowManual(false)
     setTemplateId(null)
     setSaved(false)
@@ -157,6 +185,11 @@ export default function EditorPage() {
     const problem = validatePoints(points)
     if (problem) {
       setError(problem)
+      const m = problem.match(/^Punkt (\d+):/)
+      if (m) {
+        setSelected(Number(m[1]) - 1)
+        setSheetOpen(true)
+      }
       return
     }
     try {
@@ -207,6 +240,7 @@ export default function EditorPage() {
       setTitle(route.title)
       setPoints(route.points)
       setSelected(0)
+      setSheetOpen(false)
       setSaved(false)
       setError(null)
     } catch (err) {
@@ -301,6 +335,145 @@ export default function EditorPage() {
     )
   }
 
+  const canSave = title.trim() !== '' && points.length > 0 && !saving
+  const saveLabel = saving
+    ? 'Zapisuję…'
+    : templateId
+      ? `Zapisz zmiany (${points.length} pkt)`
+      : `Zapisz trasę (${points.length} pkt)`
+  const saveHint = !title.trim()
+    ? 'Wpisz tytuł trasy u góry ekranu.'
+    : points.length === 0
+      ? 'Dodaj co najmniej jeden punkt na mapie.'
+      : null
+
+  const mapEl = (
+    <div className="map-holder">
+      <MapView
+        points={points}
+        selected={selected}
+        mapRef={mapRef}
+        onAdd={add}
+        onSelect={selectFromMap}
+        onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
+      />
+      <div className="crosshair" aria-hidden="true" />
+    </div>
+  )
+
+  // ===== Telefon: mapa, lista w pasku i dolny panel z zapisem =====
+  if (isMobile) {
+    return (
+      <main className="editor with-dock">
+        <h1>{templateId ? 'Edycja trasy' : 'Nowa trasa'}</h1>
+        {templateId && (
+          <p className="note">
+            Zapisanie nadpisze trasę. Gry już uruchomione zostają bez zmian.{' '}
+            <Link to="/konto">Moje trasy</Link>
+          </p>
+        )}
+
+        <input
+          className="answer"
+          aria-label="Tytuł trasy"
+          placeholder="Tytuł trasy"
+          value={title}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            setError(null)
+          }}
+        />
+
+        <details className="card more-options">
+          <summary>Więcej opcji</summary>
+          <label>
+            <input
+              type="checkbox"
+              checked={allowManual}
+              onChange={(e) => setAllowManual(e.target.checked)}
+            />
+            <span>Tryb awaryjny: przycisk „Jestem na miejscu” przy słabym GPS</span>
+          </label>
+          <div className="row">
+            <button type="button" onClick={onExport} disabled={!title.trim() || points.length === 0}>
+              Eksport JSON
+            </button>
+            <label className="file">
+              Import JSON
+              <input type="file" accept="application/json,.json" onChange={onImport} />
+            </label>
+          </div>
+        </details>
+
+        {mapEl}
+
+        <div className="toolbar-m" role="group" aria-label="Dodawanie i przesuwanie punktów">
+          <button
+            type="button"
+            className="big"
+            onClick={addAtCenter}
+            aria-label="Dodaj punkt na środku mapy"
+          >
+            Dodaj punkt
+          </button>
+          <button
+            type="button"
+            onClick={addHere}
+            disabled={locating}
+            aria-label="Dodaj punkt w mojej lokalizacji"
+          >
+            {locating ? 'Szukam…' : 'Moja lokalizacja'}
+          </button>
+          <button
+            type="button"
+            onClick={moveSelectedToCenter}
+            disabled={selected === null}
+            aria-label="Przesuń wybrany punkt na środek mapy"
+          >
+            Przesuń do celownika
+          </button>
+        </div>
+
+        {points.length === 0 ? (
+          <p className="note">
+            Przesuń mapę tak, aby celownik wskazywał miejsce, i dotknij „Dodaj punkt”. Punkt możesz
+            też dodać dotknięciem mapy.
+          </p>
+        ) : (
+          <PointList points={points} selected={selected} onSelect={selectFromList} />
+        )}
+
+        <div className="dock">
+          {selected !== null && points[selected] && (
+            <PointSheet
+              point={points[selected]}
+              index={selected}
+              total={points.length}
+              open={sheetOpen}
+              onToggle={() => setSheetOpen((v) => !v)}
+              onChange={(patch) => patchPoint(selected, patch)}
+              onMoveUp={() => move(selected, selected - 1)}
+              onMoveDown={() => move(selected, selected + 1)}
+              onDelete={() => void remove(selected)}
+            />
+          )}
+          <div className="dock-save">
+            {error && (
+              <p role="alert" className="bad">
+                {error}
+              </p>
+            )}
+            {!error && saveHint && <p className="note">{saveHint}</p>}
+            <button type="button" className="big" disabled={!canSave} onClick={() => void save()}>
+              {saveLabel}
+            </button>
+          </div>
+        </div>
+      </main>
+    )
+  }
+
+  // ===== Komputer: układ bez zmian =====
   return (
     <main className="editor">
       <h1>{templateId ? 'Edycja trasy' : 'Nowa trasa'}</h1>
@@ -316,14 +489,13 @@ export default function EditorPage() {
           aria-label="Tytuł trasy"
           placeholder="Tytuł trasy"
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setTitle(e.target.value)
+            setError(null)
+          }}
         />
-        <button onClick={save} disabled={!title.trim() || points.length === 0 || saving}>
-          {saving
-            ? 'Zapisuję…'
-            : templateId
-              ? `Zapisz zmiany (${points.length} pkt)`
-              : `Zapisz trasę (${points.length} pkt)`}
+        <button onClick={() => void save()} disabled={!canSave}>
+          {saveLabel}
         </button>
         <button onClick={onExport} disabled={!title.trim() || points.length === 0}>
           Eksport JSON
@@ -368,16 +540,9 @@ export default function EditorPage() {
       </p>
 
       <div className="layout">
-        <MapView
-          points={points}
-          selected={selected}
-          mapRef={mapRef}
-          onAdd={add}
-          onSelect={setSelected}
-          onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
-        />
+        {mapEl}
         <aside>
-          <PointList points={points} selected={selected} onSelect={setSelected} />
+          <PointList points={points} selected={selected} onSelect={selectFromList} />
           {selected !== null && points[selected] ? (
             <PointForm
               point={points[selected]}
@@ -386,7 +551,7 @@ export default function EditorPage() {
               onChange={(patch) => patchPoint(selected, patch)}
               onMoveUp={() => move(selected, selected - 1)}
               onMoveDown={() => move(selected, selected + 1)}
-              onDelete={() => remove(selected)}
+              onDelete={() => void remove(selected)}
             />
           ) : (
             points.length > 0 && (
