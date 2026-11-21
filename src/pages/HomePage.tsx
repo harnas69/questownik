@@ -10,6 +10,27 @@ const STEPS = [
   'Zdobywaj punkty i śledź ranking na żywo.',
 ]
 
+const FEATURES = [
+  'Odblokowanie zadań przez GPS lub kod QR',
+  'Quiz, pytanie otwarte, kod i zadania ze zdjęciem',
+  'Ranking na żywo i wyniki do pobrania (CSV)',
+  'Biblioteka gotowych tras od innych nauczycieli',
+]
+
+function RouteArt() {
+  return (
+    <svg className="route-art" viewBox="0 0 320 110" aria-hidden="true" focusable="false">
+      <path className="ra-path" d="M20 80 C 70 20, 110 110, 160 55 S 260 10, 300 40" />
+      <circle cx="20" cy="80" r="14" />
+      <text x="20" y="80">1</text>
+      <circle cx="160" cy="55" r="14" />
+      <text x="160" y="55">2</text>
+      <circle cx="300" cy="40" r="14" />
+      <text x="300" y="40">3</text>
+    </svg>
+  )
+}
+
 export default function HomePage() {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +49,7 @@ export default function HomePage() {
   return (
     <main className="play home">
       <div className="hero">
-        <span className="eyebrow">Gra terenowa dla klas</span>
+        <RouteArt />
         <h1>Questownik</h1>
         <p className="lead">
           Idź na trasę, odblokowuj zadania na miejscu i zdobywaj punkty. Bez zakładania konta.
@@ -76,12 +97,19 @@ export default function HomePage() {
 
       <section aria-labelledby="teachers" className="block">
         <h2 id="teachers">Dla nauczycieli</h2>
+        <ul className="feature-list">
+          {FEATURES.map((f) => (
+            <li key={f}>{f}</li>
+          ))}
+        </ul>
         <div className="cta-grid">
           <Link className="card cta-card" to="/biblioteka">
+            <span className="cta-icon" aria-hidden="true">📚</span>
             <strong>Biblioteka tras</strong>
             <span>Gotowe trasy innych nauczycieli: uruchom z nich grę lub skopiuj do siebie.</span>
           </Link>
           <Link className="card cta-card" to="/konto">
+            <span className="cta-icon" aria-hidden="true">🗺️</span>
             <strong>Moje konto</strong>
             <span>Utwórz własną trasę, uruchom grę z klasą i oglądaj wyniki na żywo.</span>
           </Link>

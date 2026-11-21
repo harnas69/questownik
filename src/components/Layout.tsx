@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import ThemeToggle from './ThemeToggle'
 
@@ -20,6 +20,7 @@ export default function Layout() {
   const { user } = useAuth()
   const content = useRef<HTMLDivElement>(null)
   const first = useRef(true)
+  const onPrivacy = pathname.startsWith('/prywatnosc')
 
   useEffect(() => {
     document.title = titleFor(pathname)
@@ -45,20 +46,40 @@ export default function Layout() {
       </a>
       <header className="site-header">
         <Link to="/" className="brand">
-          <span aria-hidden="true">📍</span> Questownik
+          <span className="brand-mark" aria-hidden="true">
+            <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z" />
+              <circle cx="12" cy="9.5" r="2.6" />
+            </svg>
+          </span>
+          <span>Questownik</span>
         </Link>
         <nav aria-label="Główna nawigacja">
-          <Link to="/biblioteka">Biblioteka</Link>
-          <Link to="/konto">{user ? 'Moje konto' : 'Dla nauczyciela'}</Link>
+          <NavLink to="/biblioteka">Biblioteka</NavLink>
+          <NavLink to="/konto" className="nav-cta">
+            {user ? 'Moje konto' : 'Zaloguj się'}
+          </NavLink>
           <ThemeToggle />
         </nav>
       </header>
       <div id="content" tabIndex={-1} ref={content}>
         <Outlet />
       </div>
-      <footer className="site-footer">
-        <Link to="/prywatnosc">Prywatność</Link>
-      </footer>
+      {!onPrivacy && (
+        <footer className="site-footer">
+          <span>Questownik</span>
+          <Link to="/prywatnosc">Prywatność</Link>
+        </footer>
+      )}
     </>
   )
 }
