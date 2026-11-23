@@ -710,3 +710,21 @@ body:has(.dock) .offline { bottom: calc(170px + env(safe-area-inset-bottom)); }
 .tab-badge.neutral {
   background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong);
 }
+
+/* ===== Poprawki: wysokość kart, kompaktowe usuwanie konta ===== */
+
+/* Rozwinięcie jednej karty nie rozciąga sąsiedniej */
+.route-list { align-items: start; }
+
+/* Usuwanie konta: niski, wąski wiersz, formularz dopiero po rozwinięciu */
+details.danger-zone {
+  max-width: 420px;
+  padding: 0 16px;
+  gap: 0;
+}
+details.danger-zone > summary { min-height: 48px; font-size: 0.95rem; }
+details.danger-zone[open] { padding-bottom: 16px; }
+details.danger-zone[open] > summary { margin-bottom: 8px; }
+
+/* Przyciski w formularzach mają zwykły rozmiar, nie pełną szerokość */
+.auth-form > button:not(.big):not(.link-button) { align-self: flex-start; }
