@@ -14,6 +14,7 @@ interface Props {
   onAdd: (lat: number, lng: number) => void
   onSelect: (index: number) => void
   onMove: (index: number, lat: number, lng: number) => void
+  clickToAdd?: boolean
 }
 
 // Okrągły znacznik z numerem (bez plików graficznych, więc nie może się "zepsuć")
@@ -50,7 +51,15 @@ function FocusSelected({ point }: { point: DraftPoint | null }) {
   return null
 }
 
-export default function MapView({ points, selected, mapRef, onAdd, onSelect, onMove }: Props) {
+export default function MapView({
+  points,
+  selected,
+  mapRef,
+  onAdd,
+  onSelect,
+  onMove,
+  clickToAdd = true,
+}: Props) {
   const selectedPoint = selected !== null ? (points[selected] ?? null) : null
 
   return (
@@ -61,7 +70,7 @@ export default function MapView({ points, selected, mapRef, onAdd, onSelect, onM
       style={{ height: '70vh', width: '100%' }}
     >
       <TileLayer crossOrigin attribution={TILE_ATTRIBUTION} url={TILE_URL} />
-      <ClickHandler onAdd={onAdd} />
+      {clickToAdd && <ClickHandler onAdd={onAdd} />}
       <FocusSelected point={selectedPoint} />
       {points.map((p, i) => (
         <Fragment key={i}>

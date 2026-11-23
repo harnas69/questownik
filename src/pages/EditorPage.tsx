@@ -354,6 +354,7 @@ export default function EditorPage() {
         selected={selected}
         mapRef={mapRef}
         onAdd={add}
+        clickToAdd={!isMobile}
         onSelect={selectFromMap}
         onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
       />
@@ -436,8 +437,7 @@ export default function EditorPage() {
 
         {points.length === 0 ? (
           <p className="note">
-            Przesuń mapę tak, aby celownik wskazywał miejsce, i dotknij „Dodaj punkt”. Punkt możesz
-            też dodać dotknięciem mapy.
+            Przesuń mapę tak, aby celownik wskazywał miejsce, i dotknij „Dodaj punkt”.
           </p>
         ) : (
           <PointList points={points} selected={selected} onSelect={selectFromList} />

@@ -61,7 +61,7 @@ export default function Layout() {
               <circle cx="12" cy="9.5" r="2.6" />
             </svg>
           </span>
-          <span>Questownik</span>
+          <span className="brand-name">Questownik</span>
         </Link>
         <nav aria-label="Główna nawigacja">
           <NavLink to="/biblioteka">Biblioteka</NavLink>

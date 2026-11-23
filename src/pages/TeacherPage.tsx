@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import GameShare from '../components/GameShare'
+import { BlockSkeleton } from '../components/Skeleton'
+import Tabs from '../components/Tabs'
+import type { TabDef } from '../components/Tabs'
+import { useConfirm } from '../lib/confirm'
 import { buildCsv, downloadCsv } from '../lib/csv'
 import { durationMs, sortRanking } from '../lib/ranking'
 import {
@@ -17,12 +22,8 @@ import {
   setClosed,
 } from '../lib/teacherApi'
 import type { Overview, PhotoItem, TeamResult } from '../lib/teacherApi'
-import { TASK_LABELS } from '../types/route'
 import { forgetKey, readKey, storeKey } from '../lib/teacherKey'
-import GameShare from '../components/GameShare'
-import { useConfirm } from '../lib/confirm'
-import { BlockSkeleton } from '../components/Skeleton'
-
+import { TASK_LABELS } from '../types/route'
 
 function fmt(ms: number): string {
   const s = Math.floor(ms / 1000)
@@ -49,7 +50,6 @@ function PhotoImage({
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
-
   useEffect(() => {
     let cancelled = false
     fetchPhotoImage(code, teacherKey, id)
@@ -73,17 +73,19 @@ export default function TeacherPage() {
   const code = (useParams().code ?? '').toUpperCase()
   const navigate = useNavigate()
   const askConfirm = useConfirm()
+
   const [key, setKey] = useState(() => readKey(code))
   const [keyInput, setKeyInput] = useState('')
   const [overview, setOverview] = useState<Overview | null>(null)
   const [teams, setTeams] = useState<TeamResult[]>([])
   const [photos, setPhotos] = useState<PhotoItem[]>([])
+  const [qrCount, setQrCount] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmCode, setConfirmCode] = useState('')
-  const [qrCount, setQrCount] = useState(0)
+  const [chosen, setChosen] = useState<string | null>(null)
 
   const rejectKey = useCallback(() => {
     forgetKey(code)
@@ -105,6 +107,8 @@ export default function TeacherPage() {
       setTeams(sortRanking(t))
       setPhotos(p)
       setQrCount(q.length)
+      // Zakładka startowa jest ustalana raz, żeby panel nie przełączał się sam w trakcie pracy
+      setChosen((c) => c ?? (o.teams === 0 ? 'join' : 'results'))
       setError(null)
     } catch (e) {
       console.error(e)
@@ -202,7 +206,7 @@ export default function TeacherPage() {
     const ok = await askConfirm({
       title: 'Wyczyścić wyniki?',
       message:
-        'Wyniki wszystkich drużyn i zdjęcia zostaną usunięte. Trasa zostanie, a gracze zaczną od nowa. Nie da się tego cofnąć.',
+        'Wyniki wszystkich drużyn i zdjęcia zostaną usunięte. Gra zostanie, a gracze zaczną od nowa. Nie da się tego cofnąć.',
       confirmLabel: 'Wyczyść wyniki',
       danger: true,
     })
@@ -220,8 +224,8 @@ export default function TeacherPage() {
     await guard(async () => {
       await deleteRoute(code, key)
       forgetKey(code)
-      navigate('/')
-    }, 'Nie udało się usunąć trasy.')
+      navigate('/konto')
+    }, 'Nie udało się usunąć gry.')
   }
 
   const exportCsv = () => {
@@ -235,7 +239,7 @@ export default function TeacherPage() {
         <h1>Panel nauczyciela</h1>
         <form className="card" onSubmit={submitKey}>
           <label htmlFor="tkey" className="field-label">
-            Klucz nauczyciela (trasa {code})
+            Klucz nauczyciela (gra {code})
           </label>
           <input
             id="tkey"
@@ -286,13 +290,46 @@ export default function TeacherPage() {
   const pending = sortedPhotos.filter((i) => i.status === 'pending').length
   const reviewed = sortedPhotos.length - pending
 
+  const tabs: TabDef[] = [
+    { id: 'results', label: 'Wyniki' },
+    ...(showPhotos
+      ? [
+          {
+            id: 'photos',
+            label: 'Zdjęcia',
+            badge: pending > 0 ? { count: pending, label: 'do sprawdzenia' } : undefined,
+          },
+        ]
+      : []),
+    { id: 'join', label: 'Dołączanie' },
+    { id: 'manage', label: 'Zarządzanie' },
+  ]
+  const active = chosen && tabs.some((t) => t.id === chosen) ? chosen : 'results'
+
   return (
     <main className="teacher">
-      <h1>Panel nauczyciela: {overview.title}</h1>
-      <p className="note">
-        Trasa {code}. Dane odświeżają się co 15 sekund.{' '}
-        <Link to={`/ranking/${code}`}>Ranking publiczny (do wyświetlenia na projektorze)</Link>
-      </p>
+      <header className="panel-head">
+        <p className="eyebrow-s">Panel nauczyciela · kod {code}</p>
+        <h1>{overview.title}</h1>
+        <div className="row">
+          <span className={overview.closed ? 'badge' : 'badge near'}>
+            {overview.closed ? 'Gra zakończona' : 'Gra trwa'}
+          </span>
+          <span>
+            Drużyn: <strong>{overview.teams}</strong> · ukończyło:{' '}
+            <strong>{overview.finished}</strong>
+          </span>
+        </div>
+        <div className="row">
+          <Link className="btn-link" to={`/ranking/${code}`}>
+            Ranking na projektor
+          </Link>
+          <button type="button" onClick={() => void load()}>
+            Odśwież
+          </button>
+        </div>
+        <p className="note">Dane odświeżają się same co 15 sekund.</p>
+      </header>
 
       {error && (
         <p role="alert" className="bad">
@@ -303,232 +340,241 @@ export default function TeacherPage() {
         {notice}
       </p>
 
-      <div className="row">
-        <span className={overview.closed ? 'badge' : 'badge near'}>
-          {overview.closed ? 'Gra zakończona' : 'Gra trwa'}
-        </span>
-        <span>
-          Drużyn: <strong>{overview.teams}</strong>, ukończyło: <strong>{overview.finished}</strong>
-        </span>
-        <button type="button" onClick={() => void load()}>
-          Odśwież
-        </button>
-      </div>
+      <Tabs tabs={tabs} active={active} onChange={setChosen} label="Sekcje panelu" idPrefix="tp" />
 
-      <section className="block" aria-labelledby="h-share">
-        <h2 id="h-share">Dołączanie do gry</h2>
-        <GameShare code={code} />
-      </section>
+      <div
+        role="tabpanel"
+        id={`tp-panel-${active}`}
+        aria-labelledby={`tp-${active}`}
+        tabIndex={0}
+        className="tab-panel"
+      >
+        {active === 'results' && (
+          <>
+            <section className="block" aria-labelledby="h-results">
+              <h2 id="h-results">Wyniki drużyn</h2>
+              {teams.length === 0 ? (
+                <p>Żadna drużyna jeszcze nie wystartowała.</p>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <caption className="sr-only">Wyniki drużyn</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">Drużyna</th>
+                        <th scope="col">Postęp</th>
+                        <th scope="col">Punkty</th>
+                        <th scope="col">Czas</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {teams.map((t, i) => {
+                        const d = durationMs(t)
+                        return (
+                          <tr key={t.id}>
+                            <td>{i + 1}</td>
+                            <td>{t.team_name}</td>
+                            <td>
+                              {Math.min(t.current_idx, pointCount)}/{pointCount}
+                            </td>
+                            <td>{t.score}</td>
+                            <td>{d !== null ? fmt(d) : 'w grze'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div className="row">
+                <button type="button" onClick={exportCsv} disabled={teams.length === 0}>
+                  Pobierz wyniki (CSV)
+                </button>
+              </div>
+            </section>
 
-      {qrCount > 0 && (
-        <section className="block" aria-labelledby="h-qr">
-          <h2 id="h-qr">Kody QR do wydruku</h2>
-          <p>
-            Punkty tej gry odblokowywane kodem QR: <strong>{qrCount}</strong>. Wydrukuj kody i
-            ukryj je w odpowiednich miejscach.
-          </p>
-          <Link className="btn-link" to={`/nauczyciel/${code}/qr#${key}`}>
-            Otwórz arkusz kodów QR
-          </Link>
-        </section>
-      )}
-
-      <section className="block" aria-labelledby="h-results">
-        <h2 id="h-results">Wyniki drużyn</h2>
-        {teams.length === 0 ? (
-          <p>Żadna drużyna jeszcze nie wystartowała.</p>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <caption className="sr-only">Wyniki drużyn</caption>
-              <thead>
-                <tr>
-                  <th scope="col">#</th>
-                  <th scope="col">Drużyna</th>
-                  <th scope="col">Postęp</th>
-                  <th scope="col">Punkty</th>
-                  <th scope="col">Czas</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map((t, i) => {
-                  const d = durationMs(t)
+            <section className="block" aria-labelledby="h-stats">
+              <h2 id="h-stats">Statystyki zadań</h2>
+              <ul className="stat-list">
+                {overview.points.map((p) => {
+                  const rate = p.answered > 0 ? Math.round((p.correct / p.answered) * 100) : null
+                  const isHardest = hardest !== null && hardest.position === p.position && hardest.rate < 100
                   return (
-                    <tr key={t.id}>
-                      <td>{i + 1}</td>
-                      <td>{t.team_name}</td>
-                      <td>
-                        {Math.min(t.current_idx, pointCount)}/{pointCount}
-                      </td>
-                      <td>{t.score}</td>
-                      <td>{d !== null ? fmt(d) : 'w grze'}</td>
-                    </tr>
+                    <li key={p.position} className="card stat-item">
+                      <div className="row">
+                        <span className="pl-num" aria-hidden="true">
+                          {p.position + 1}
+                        </span>
+                        <strong>Punkt {p.position + 1}</strong>
+                        <span className="note">{TASK_LABELS[p.type]}</span>
+                        {isHardest && <span className="badge">Najtrudniejsze</span>}
+                      </div>
+                      <p>{p.prompt}</p>
+                      <div className="bar" aria-hidden="true">
+                        <span style={{ width: `${rate ?? 0}%` }} />
+                      </div>
+                      <p className="stat-meta">
+                        <span>
+                          Odpowiedzi:{' '}
+                          <strong>
+                            {p.answered}/{overview.teams}
+                          </strong>
+                        </span>
+                        <span>
+                          Poprawne: <strong>{rate !== null ? `${rate}%` : '—'}</strong>
+                        </span>
+                        <span>
+                          Średnio prób: <strong>{p.avg_attempts ?? '—'}</strong>
+                        </span>
+                      </p>
+                    </li>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
+              </ul>
+              <p className="note">
+                Przy zadaniach ze zdjęciem „poprawne” oznacza zdjęcia zatwierdzone przez Ciebie.
+              </p>
+            </section>
+          </>
         )}
-        <div className="row">
-          <button type="button" onClick={exportCsv} disabled={teams.length === 0}>
-            Pobierz wyniki (CSV)
-          </button>
-        </div>
-      </section>
 
-      <section className="block" aria-labelledby="h-stats">
-        <h2 id="h-stats">Statystyki zadań</h2>
-        {hardest && hardest.rate < 100 && (
-          <p>
-            Najtrudniejsze zadanie: <strong>punkt {hardest.position + 1}</strong> ({hardest.rate}%
-            poprawnych odpowiedzi).
-          </p>
-        )}
-        <div className="table-wrap">
-          <table className="data-table">
-            <caption className="sr-only">Statystyki zadań</caption>
-            <thead>
-              <tr>
-                <th scope="col">Punkt</th>
-                <th scope="col">Zadanie</th>
-                <th scope="col">Odpowiedzi</th>
-                <th scope="col">Poprawne</th>
-                <th scope="col">Średnio prób</th>
-              </tr>
-            </thead>
-            <tbody>
-              {overview.points.map((p) => (
-                <tr key={p.position}>
-                  <td>{p.position + 1}</td>
-                  <td>
-                    <span className="note">{TASK_LABELS[p.type]}</span>
-                    <br />
-                    {p.prompt}
-                  </td>
-                  <td>
-                    {p.answered}/{overview.teams}
-                  </td>
-                  <td>
-                    {p.answered > 0 ? `${Math.round((p.correct / p.answered) * 100)}%` : '—'}
-                  </td>
-                  <td>{p.avg_attempts ?? '—'}</td>
-                </tr>
+        {active === 'photos' && (
+          <section className="block" aria-labelledby="h-photos">
+            <h2 id="h-photos">Zdjęcia</h2>
+            <p role="status">
+              Do sprawdzenia: <strong>{pending}</strong>, sprawdzone: {reviewed}
+            </p>
+            <div className="row">
+              <button type="button" onClick={() => void removeReviewed()} disabled={reviewed === 0}>
+                Usuń sprawdzone zdjęcia
+              </button>
+            </div>
+            {sortedPhotos.length === 0 && <p>Nikt jeszcze nie wysłał zdjęcia.</p>}
+            <div className="teacher-list">
+              {sortedPhotos.map((it) => (
+                <article
+                  key={it.id}
+                  className="card teacher-card"
+                  aria-label={`Zdjęcie drużyny ${it.team}, punkt ${it.position + 1}`}
+                >
+                  <PhotoImage
+                    code={code}
+                    teacherKey={key}
+                    id={it.id}
+                    alt={`Zdjęcie drużyny ${it.team}, punkt ${it.position + 1}`}
+                  />
+                  <p>
+                    <strong>{it.team}</strong> · punkt {it.position + 1}
+                  </p>
+                  <p className="note">Zadanie: {it.prompt}</p>
+                  <p>
+                    <span className={`status ${it.status}`}>{STATUS_LABEL[it.status]}</span>
+                  </p>
+                  <div className="row">
+                    <button
+                      type="button"
+                      className="approve"
+                      disabled={busyId === it.id || it.status === 'approved'}
+                      aria-label={`Zatwierdź zdjęcie drużyny ${it.team}`}
+                      onClick={() => void review(it.id, true)}
+                    >
+                      Zatwierdź
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyId === it.id || it.status === 'rejected'}
+                      aria-label={`Odrzuć zdjęcie drużyny ${it.team}`}
+                      onClick={() => void review(it.id, false)}
+                    >
+                      Odrzuć
+                    </button>
+                  </div>
+                </article>
               ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="note">
-          Przy zadaniach ze zdjęciem „poprawne” oznacza zdjęcia zatwierdzone przez Ciebie.
-        </p>
-      </section>
+            </div>
+          </section>
+        )}
 
-      {showPhotos && (
-        <section className="block" aria-labelledby="h-photos">
-          <h2 id="h-photos">Zdjęcia</h2>
-          <p role="status">
-            Do sprawdzenia: <strong>{pending}</strong>, sprawdzone: {reviewed}
-          </p>
-          <div className="row">
-            <button type="button" onClick={removeReviewed} disabled={reviewed === 0}>
-              Usuń sprawdzone zdjęcia
-            </button>
-          </div>
-          {sortedPhotos.length === 0 && <p>Nikt jeszcze nie wysłał zdjęcia.</p>}
-          <div className="teacher-list">
-            {sortedPhotos.map((it) => (
-              <article
-                key={it.id}
-                className="card teacher-card"
-                aria-label={`Zdjęcie drużyny ${it.team}, punkt ${it.position + 1}`}
+        {active === 'join' && (
+          <>
+            <section className="block" aria-labelledby="h-share">
+              <h2 id="h-share">Dołączanie do gry</h2>
+              <GameShare code={code} />
+            </section>
+            {qrCount > 0 && (
+              <section className="block" aria-labelledby="h-qr">
+                <h2 id="h-qr">Kody QR do wydruku</h2>
+                <p>
+                  Punkty tej gry odblokowywane kodem QR: <strong>{qrCount}</strong>. Wydrukuj kody
+                  i ukryj je w odpowiednich miejscach.
+                </p>
+                <Link className="btn-link" to={`/nauczyciel/${code}/qr#${key}`}>
+                  Otwórz arkusz kodów QR
+                </Link>
+              </section>
+            )}
+          </>
+        )}
+
+        {active === 'manage' && (
+          <section className="block" aria-labelledby="h-manage">
+            <h2 id="h-manage">Zarządzanie grą</h2>
+            <div className="manage-item">
+              <p>
+                <strong>{overview.closed ? 'Wznów grę' : 'Zakończ grę'}</strong>:{' '}
+                {overview.closed
+                  ? 'drużyny znów mogą startować i grać dalej.'
+                  : 'nowe drużyny nie wystartują, a obecne nie przejdą do kolejnych punktów. Możesz nadal oceniać zdjęcia.'}
+              </p>
+              <button type="button" onClick={() => void toggleClosed()}>
+                {overview.closed ? 'Wznów grę' : 'Zakończ grę'}
+              </button>
+            </div>
+
+            <div className="manage-item">
+              <p>
+                <strong>Zmiana zadań</strong>: treść działającej gry jest zamrożona, żeby nie psuć
+                wyników. Zmień trasę w zakładce „Moje trasy” i uruchom z niej nową grę.
+              </p>
+              <Link className="btn-link" to="/konto">
+                Przejdź do moich tras
+              </Link>
+            </div>
+
+            <div className="manage-item">
+              <p>
+                <strong>Wyczyść wyniki</strong>: usuwa drużyny, wyniki i zdjęcia, a gra zostaje.
+                Przydatne przed kolejnym podejściem klasy. Pobierz najpierw CSV.
+              </p>
+              <button type="button" onClick={() => void reset()} disabled={overview.teams === 0}>
+                Wyczyść wyniki graczy
+              </button>
+            </div>
+
+            <form className="manage-item danger" onSubmit={removeRoute}>
+              <p>
+                <strong>Usuń grę</strong> razem z wynikami drużyn i zdjęciami. Trasa w „Moich
+                trasach” zostaje, więc możesz uruchomić z niej nową grę. Nie da się tego cofnąć.
+              </p>
+              <label htmlFor="confirm-code">Wpisz kod gry ({code}), aby potwierdzić</label>
+              <input
+                id="confirm-code"
+                autoComplete="off"
+                value={confirmCode}
+                onChange={(e) => setConfirmCode(e.target.value)}
+              />
+              <button
+                type="submit"
+                className="danger"
+                disabled={confirmCode.trim().toUpperCase() !== code}
               >
-                <PhotoImage
-                  code={code}
-                  teacherKey={key}
-                  id={it.id}
-                  alt={`Zdjęcie drużyny ${it.team}, punkt ${it.position + 1}`}
-                />
-                <p>
-                  <strong>{it.team}</strong> · punkt {it.position + 1}
-                </p>
-                <p className="note">Zadanie: {it.prompt}</p>
-                <p>
-                  <span className={`status ${it.status}`}>{STATUS_LABEL[it.status]}</span>
-                </p>
-                <div className="row">
-                  <button
-                    type="button"
-                    className="approve"
-                    disabled={busyId === it.id || it.status === 'approved'}
-                    aria-label={`Zatwierdź zdjęcie drużyny ${it.team}`}
-                    onClick={() => void review(it.id, true)}
-                  >
-                    Zatwierdź
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyId === it.id || it.status === 'rejected'}
-                    aria-label={`Odrzuć zdjęcie drużyny ${it.team}`}
-                    onClick={() => void review(it.id, false)}
-                  >
-                    Odrzuć
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="block" aria-labelledby="h-manage">
-        <h2 id="h-manage">Zarządzanie grą</h2>
-        <div className="manage-item">
-          <p>
-            <strong>{overview.closed ? 'Wznów grę' : 'Zakończ grę'}</strong>:{' '}
-            {overview.closed
-              ? 'drużyny znów mogą startować i grać dalej.'
-              : 'nowe drużyny nie wystartują, a obecne nie przejdą do kolejnych punktów. Możesz nadal oceniać zdjęcia.'}
-          </p>
-          <button type="button" onClick={() => void toggleClosed()}>
-            {overview.closed ? 'Wznów grę' : 'Zakończ grę'}
-          </button>
-        </div>
-
-        <div className="manage-item">
-          <p>
-            <strong>Zmiana zadań</strong>: treść działającej gry jest zamrożona, żeby nie psuć
-            wyników. Zmień trasę w zakładce „Moje trasy” i uruchom z niej nową grę.
-          </p>
-          <Link className="btn-link" to="/konto">
-            Przejdź do moich tras
-          </Link>
-        </div>
-
-        <div className="manage-item">
-          <p>
-            <strong>Wyczyść wyniki</strong>: usuwa drużyny, wyniki i zdjęcia, a trasa zostaje.
-            Przydatne przed grą z kolejną klasą. Pobierz najpierw CSV.
-          </p>
-          <button type="button" onClick={() => void reset()} disabled={overview.teams === 0}>
-            Wyczyść wyniki graczy
-          </button>
-        </div>
-
-        <form className="manage-item danger" onSubmit={removeRoute}>
-          <p>
-            <strong>Usuń trasę</strong> razem ze wszystkimi danymi. Nie da się tego cofnąć.
-          </p>
-          <label htmlFor="confirm-code">Wpisz kod trasy ({code}), aby potwierdzić</label>
-          <input
-            id="confirm-code"
-            autoComplete="off"
-            value={confirmCode}
-            onChange={(e) => setConfirmCode(e.target.value)}
-          />
-          <button type="submit" disabled={confirmCode.trim().toUpperCase() !== code}>
-            Usuń trasę na zawsze
-          </button>
-        </form>
-      </section>
+                Usuń grę na zawsze
+              </button>
+            </form>
+          </section>
+        )}
+      </div>
     </main>
   )
 }
