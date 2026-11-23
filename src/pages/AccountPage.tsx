@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import CopyButton from '../components/CopyButton'
 import LoginForm from '../components/LoginForm'
+import Notice from '../components/Notice'
 import PublishForm from '../components/PublishForm'
+import { BlockSkeleton, PageSkeleton } from '../components/Skeleton'
+import Tabs from '../components/Tabs'
+import type { TabDef } from '../components/Tabs'
 import {
   accountErrorMessage,
   claimRoute,
@@ -15,15 +19,45 @@ import {
 } from '../lib/accountApi'
 import type { GameItem, TemplateItem } from '../lib/accountApi'
 import { signOutAccount, useAuth } from '../lib/auth'
+import { useConfirm } from '../lib/confirm'
 import { plural } from '../lib/plural'
 import { parseTeacherLink } from '../lib/teacherLink'
-import { useConfirm } from '../lib/confirm'
-import { BlockSkeleton, PageSkeleton } from '../components/Skeleton'
+import { useNotice } from '../lib/useNotice'
+
+type TabId = 'routes' | 'games' | 'settings'
+type GameFilter = 'all' | 'open' | 'closed'
+
+const SEARCH_MIN = 5
+const norm = (s: string) => s.toLocaleLowerCase('pl-PL')
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('pl-PL')
 
 function statusOf(t: TemplateItem): { text: string; cls: string } {
   if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
   if (t.is_public) return { text: 'Publiczna w bibliotece', cls: 'badge near' }
   return { text: 'Prywatna', cls: 'badge' }
+}
+
+function Empty({
+  icon,
+  title,
+  text,
+  children,
+}: {
+  icon: string
+  title: string
+  text: string
+  children?: ReactNode
+}) {
+  return (
+    <div className="card empty">
+      <span className="empty-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <h3>{title}</h3>
+      <p className="note">{text}</p>
+      {children && <div className="row">{children}</div>}
+    </div>
+  )
 }
 
 function DeleteAccount() {
@@ -82,7 +116,7 @@ function DeleteAccount() {
             {error}
           </p>
         )}
-        <button type="submit" disabled={!ok || busy}>
+        <button type="submit" className="danger" disabled={!ok || busy}>
           {busy ? 'Usuwam…' : 'Usuń konto na zawsze'}
         </button>
       </form>
@@ -96,8 +130,12 @@ function MyContent() {
   const [templates, setTemplates] = useState<TemplateItem[] | null>(null)
   const [games, setGames] = useState<GameItem[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState('')
+  const [notice, setNotice] = useNotice()
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [tab, setTab] = useState<TabId>('routes')
+  const [tq, setTq] = useState('')
+  const [gq, setGq] = useState('')
+  const [gfilter, setGfilter] = useState<GameFilter>('all')
   const [linkText, setLinkText] = useState('')
   const [claiming, setClaiming] = useState(false)
 
@@ -145,11 +183,11 @@ function MyContent() {
 
   const remove = async (t: TemplateItem) => {
     const extra =
-      t.games > 0 ? ` Uruchomione z niej gry (${t.games}) zostaną i nadal będą działać.` : ''
-    const pub = t.is_public ? ' Zniknie też z biblioteki.' : ''
+      t.games > 0 ? `Uruchomione z niej gry (${t.games}) zostaną i nadal będą działać. ` : ''
+    const pub = t.is_public ? 'Zniknie też z biblioteki. ' : ''
     const ok = await askConfirm({
       title: `Usunąć trasę „${t.title}”?`,
-      message: `${extra}${pub} Nie da się tego cofnąć.`.trim(),
+      message: `${extra}${pub}Nie da się tego cofnąć.`,
       confirmLabel: 'Usuń trasę',
       danger: true,
     })
@@ -179,12 +217,12 @@ function MyContent() {
     }
     setClaiming(true)
     setError(null)
-    setNotice('')
     try {
       const code = await claimRoute(parsed.code, parsed.key)
       setLinkText('')
       await reload()
       setNotice(`Gra ${code} została dodana do Twojego konta (razem z trasą).`)
+      setTab('games')
     } catch (err) {
       console.error(err)
       setError(accountErrorMessage(err))
@@ -195,6 +233,41 @@ function MyContent() {
 
   const origin = window.location.origin
 
+  const tabs: TabDef[] = [
+    {
+      id: 'routes',
+      label: 'Trasy',
+      badge:
+        templates && templates.length > 0
+          ? {
+              count: templates.length,
+              label: plural(templates.length, 'trasa', 'trasy', 'tras'),
+              tone: 'neutral',
+            }
+          : undefined,
+    },
+    {
+      id: 'games',
+      label: 'Gry',
+      badge:
+        games && games.length > 0
+          ? { count: games.length, label: plural(games.length, 'gra', 'gry', 'gier'), tone: 'neutral' }
+          : undefined,
+    },
+    { id: 'settings', label: 'Ustawienia' },
+  ]
+
+  const tqNorm = norm(tq.trim())
+  const shownTemplates = (templates ?? []).filter((t) => tqNorm === '' || norm(t.title).includes(tqNorm))
+
+  const gqNorm = norm(gq.trim())
+  const shownGames = (games ?? []).filter(
+    (g) =>
+      (gfilter === 'all' || (gfilter === 'open' ? !g.closed : g.closed)) &&
+      (gqNorm === '' || norm(g.title).includes(gqNorm) || g.code.toLowerCase().includes(gqNorm))
+  )
+  const gamesFiltering = gqNorm !== '' || gfilter !== 'all'
+
   return (
     <>
       <div className="row">
@@ -202,7 +275,7 @@ function MyContent() {
           Utwórz nową trasę
         </Link>
         <Link className="big secondary" to="/biblioteka">
-          Przeglądaj bibliotekę tras
+          Biblioteka tras
         </Link>
       </div>
 
@@ -211,108 +284,266 @@ function MyContent() {
           {error}
         </p>
       )}
-      <p role="status" className="notice">
-        {notice}
-      </p>
+      <Notice text={notice} />
 
-      <section aria-labelledby="my-routes-title" className="block">
-        <h2 id="my-routes-title">Moje trasy</h2>
-        <p className="note">
-          Trasa to szablon zadań. Uruchom z niej grę, gdy chcesz zagrać z klasą. Z jednej trasy
-          możesz uruchomić wiele gier, każdą z własnym kodem i rankingiem. Trasę możesz też
-          udostępnić innym w bibliotece.
-        </p>
-        {templates === null && !error && <BlockSkeleton label="Wczytuję trasy…" />}
-        {templates !== null && templates.length === 0 && (
-          <p>Nie masz jeszcze żadnych tras. Utwórz pierwszą albo skopiuj gotową z biblioteki.</p>
-        )}
-        {templates !== null && templates.length > 0 && (
-          <ul className="route-list">
-            {templates.map((t) => {
-              const st = statusOf(t)
-              return (
-                <li key={t.id} className="card route-item">
-                  <h3>{t.title}</h3>
-                  <p className="note">
-                    <span className={st.cls}>{st.text}</span> · {t.points}{' '}
-                    {plural(t.points, 'punkt', 'punkty', 'punktów')} · {t.games}{' '}
-                    {plural(t.games, 'gra', 'gry', 'gier')} · zmieniona{' '}
-                    {new Date(t.updated_at).toLocaleDateString('pl-PL')}
-                  </p>
-                  <div className="row">
-                    <button type="button" disabled={busyId === t.id} onClick={() => void launch(t)}>
-                      {busyId === t.id ? 'Chwileczkę…' : 'Uruchom grę'}
-                    </button>
-                    <Link className="btn-link" to={`/edytor/${t.id}`}>
-                      Edytuj
-                    </Link>
-                    <button type="button" disabled={busyId === t.id} onClick={() => void remove(t)}>
-                      Usuń
-                    </button>
+      <Tabs
+        tabs={tabs}
+        active={tab}
+        onChange={(id) => setTab(id as TabId)}
+        label="Sekcje konta"
+        idPrefix="acc"
+      />
+
+      <div
+        role="tabpanel"
+        id={`acc-panel-${tab}`}
+        aria-labelledby={`acc-${tab}`}
+        tabIndex={0}
+        className="tab-panel"
+      >
+        {tab === 'routes' && (
+          <section className="block" aria-labelledby="h-routes">
+            <h2 id="h-routes" className="sr-only">
+              Moje trasy
+            </h2>
+            <p className="note">
+              Trasa to szablon zadań. Uruchom z niej grę, gdy chcesz zagrać z klasą. Z jednej trasy
+              możesz uruchomić wiele gier, każdą z własnym kodem i rankingiem.
+            </p>
+
+            {templates === null && !error && <BlockSkeleton rows={2} label="Wczytuję trasy…" />}
+
+            {templates !== null && templates.length === 0 && (
+              <Empty
+                icon="🗺️"
+                title="Nie masz jeszcze żadnych tras"
+                text="Utwórz pierwszą od zera albo skopiuj gotową z biblioteki."
+              >
+                <Link className="btn-link primary" to="/edytor">
+                  Utwórz trasę
+                </Link>
+                <Link className="btn-link" to="/biblioteka">
+                  Przeglądaj bibliotekę
+                </Link>
+              </Empty>
+            )}
+
+            {templates !== null && templates.length > 0 && (
+              <>
+                {templates.length >= SEARCH_MIN && (
+                  <div className="list-tools">
+                    <label htmlFor="tq" className="sr-only">
+                      Szukaj w moich trasach
+                    </label>
+                    <input
+                      id="tq"
+                      type="search"
+                      className="answer"
+                      placeholder="Szukaj trasy…"
+                      autoComplete="off"
+                      value={tq}
+                      onChange={(e) => setTq(e.target.value)}
+                    />
                   </div>
-                  <details className="publish">
-                    <summary>Biblioteka: {st.text.toLowerCase()}</summary>
-                    <PublishForm template={t} onDone={afterPublish} onError={setError} />
-                  </details>
-                </li>
-              )
-            })}
-          </ul>
-        )}
-      </section>
+                )}
 
-      <section aria-labelledby="my-games-title" className="block">
-        <h2 id="my-games-title">Moje gry</h2>
-        {games === null && !error && <BlockSkeleton label="Wczytuję gry…" />}
-        {games !== null && games.length === 0 && (
-          <p>Nie prowadzisz jeszcze żadnej gry. Uruchom ją z jednej ze swoich tras.</p>
+                {shownTemplates.length === 0 ? (
+                  <p role="status">Nic nie znaleziono dla „{tq.trim()}”.</p>
+                ) : (
+                  <ul className="route-list">
+                    {shownTemplates.map((t) => {
+                      const st = statusOf(t)
+                      return (
+                        <li key={t.id} className="card route-item">
+                          <div className="item-head">
+                            <h3>{t.title}</h3>
+                            <span className={st.cls}>{st.text}</span>
+                          </div>
+                          <p className="note">
+                            {t.points} {plural(t.points, 'punkt', 'punkty', 'punktów')} · {t.games}{' '}
+                            {plural(t.games, 'gra', 'gry', 'gier')} · zmieniona {fmtDate(t.updated_at)}
+                          </p>
+                          <div className="row">
+                            <button
+                              type="button"
+                              className="primary"
+                              disabled={busyId === t.id}
+                              onClick={() => void launch(t)}
+                            >
+                              {busyId === t.id ? 'Chwileczkę…' : 'Uruchom grę'}
+                            </button>
+                            <Link className="btn-link" to={`/edytor/${t.id}`}>
+                              Edytuj
+                            </Link>
+                          </div>
+                          <details className="publish">
+                            <summary>Więcej: biblioteka i usuwanie</summary>
+                            <div className="more-box">
+                              <h4>Udostępnianie w bibliotece</h4>
+                              <PublishForm template={t} onDone={afterPublish} onError={setError} />
+                              <hr className="sep" />
+                              <button
+                                type="button"
+                                className="danger"
+                                disabled={busyId === t.id}
+                                onClick={() => void remove(t)}
+                              >
+                                Usuń trasę
+                              </button>
+                            </div>
+                          </details>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </>
+            )}
+          </section>
         )}
-        {games !== null && games.length > 0 && (
-          <ul className="route-list">
-            {games.map((g) => (
-              <li key={g.code} className="card route-item">
-                <h3>{g.title}</h3>
+
+        {tab === 'games' && (
+          <section className="block" aria-labelledby="h-games">
+            <h2 id="h-games" className="sr-only">
+              Moje gry
+            </h2>
+
+            {games === null && !error && <BlockSkeleton rows={2} label="Wczytuję gry…" />}
+
+            {games !== null && games.length === 0 && (
+              <Empty
+                icon="🎯"
+                title="Nie prowadzisz jeszcze żadnej gry"
+                text="Grę uruchamiasz z jednej ze swoich tras. Dostajesz kod i kod QR dla uczniów."
+              >
+                {templates !== null && templates.length > 0 ? (
+                  <button type="button" className="primary" onClick={() => setTab('routes')}>
+                    Przejdź do moich tras
+                  </button>
+                ) : (
+                  <Link className="btn-link primary" to="/edytor">
+                    Utwórz trasę
+                  </Link>
+                )}
+              </Empty>
+            )}
+
+            {games !== null && games.length > 0 && (
+              <>
+                {games.length >= SEARCH_MIN && (
+                  <div className="list-tools">
+                    <label htmlFor="gq" className="sr-only">
+                      Szukaj w moich grach
+                    </label>
+                    <input
+                      id="gq"
+                      type="search"
+                      className="answer"
+                      placeholder="Szukaj po tytule lub kodzie…"
+                      autoComplete="off"
+                      value={gq}
+                      onChange={(e) => setGq(e.target.value)}
+                    />
+                    <label htmlFor="gf" className="sr-only">
+                      Pokaż gry
+                    </label>
+                    <select
+                      id="gf"
+                      value={gfilter}
+                      onChange={(e) => setGfilter(e.target.value as GameFilter)}
+                    >
+                      <option value="all">Wszystkie</option>
+                      <option value="open">Trwające</option>
+                      <option value="closed">Zakończone</option>
+                    </select>
+                  </div>
+                )}
+
+                {gamesFiltering && (
+                  <p role="status" className="note">
+                    Wyświetlono {shownGames.length} z {games.length}.
+                  </p>
+                )}
+
+                {shownGames.length === 0 ? (
+                  <p>Żadna gra nie pasuje do wybranych filtrów.</p>
+                ) : (
+                  <ul className="route-list">
+                    {shownGames.map((g) => (
+                      <li key={g.code} className="card route-item">
+                        <div className="item-head">
+                          <h3>{g.title}</h3>
+                          <span className={g.closed ? 'badge' : 'badge near'}>
+                            {g.closed ? 'Zakończona' : 'Trwa'}
+                          </span>
+                        </div>
+                        <p className="game-code">
+                          <span className="note">Kod gry</span>
+                          <strong>{g.code}</strong>
+                        </p>
+                        <p className="note">
+                          {g.teams} {plural(g.teams, 'drużyna', 'drużyny', 'drużyn')} · {g.points}{' '}
+                          {plural(g.points, 'punkt', 'punkty', 'punktów')} · uruchomiona{' '}
+                          {fmtDate(g.created_at)}
+                        </p>
+                        <div className="row">
+                          <Link className="btn-link primary" to={`/nauczyciel/${g.code}#konto`}>
+                            Panel
+                          </Link>
+                          <Link className="btn-link" to={`/gra/${g.code}`}>
+                            Zagraj
+                          </Link>
+                          <CopyButton text={`${origin}/gra/${g.code}`} label="Kopiuj link do gry" />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </section>
+        )}
+
+        {tab === 'settings' && (
+          <>
+            <section className="block" aria-labelledby="h-claim">
+              <h2 id="h-claim">Dodaj starą grę z linku nauczyciela</h2>
+              <form className="card auth-form" onSubmit={claim}>
                 <p className="note">
-                  Kod: <strong>{g.code}</strong> · {g.teams}{' '}
-                  {plural(g.teams, 'drużyna', 'drużyny', 'drużyn')} ·{' '}
-                  {g.closed ? 'zakończona' : 'trwa'} · uruchomiona{' '}
-                  {new Date(g.created_at).toLocaleDateString('pl-PL')}
+                  Dotyczy gier utworzonych, zanim pojawiły się konta. Wklej cały link nauczyciela
+                  (z końcówką po znaku #), a gra trafi do Twojego konta razem z trasą.
                 </p>
-                <div className="row">
-                  <Link className="btn-link" to={`/nauczyciel/${g.code}#konto`}>
-                    Panel
-                  </Link>
-                  <Link className="btn-link" to={`/gra/${g.code}`}>
-                    Zagraj
-                  </Link>
-                  <CopyButton text={`${origin}/gra/${g.code}`} label="Kopiuj link do gry" />
-                </div>
-              </li>
-            ))}
-          </ul>
+                <label htmlFor="claim-link" className="field-label">
+                  Link nauczyciela
+                </label>
+                <input
+                  id="claim-link"
+                  className="answer"
+                  autoComplete="off"
+                  value={linkText}
+                  onChange={(e) => setLinkText(e.target.value)}
+                />
+                <button type="submit" disabled={claiming || !linkText.trim()}>
+                  {claiming ? 'Dodaję…' : 'Dodaj do mojego konta'}
+                </button>
+              </form>
+            </section>
+
+            <section className="block" aria-labelledby="h-privacy">
+              <h2 id="h-privacy">Prywatność</h2>
+              <p>
+                Przeczytaj, jakie dane zbiera Questownik i jak je usuwać.{' '}
+                <Link to="/prywatnosc">Informacja o prywatności</Link>
+              </p>
+            </section>
+
+            <section className="block" aria-labelledby="h-danger">
+              <h2 id="h-danger">Usuwanie konta</h2>
+              <DeleteAccount />
+            </section>
+          </>
         )}
-      </section>
-
-      <details className="card">
-        <summary>Dodaj starą grę z linku nauczyciela</summary>
-        <form className="auth-form" onSubmit={claim}>
-          <label htmlFor="claim-link" className="field-label">
-            Link nauczyciela (z końcówką po znaku #)
-          </label>
-          <input
-            id="claim-link"
-            className="answer"
-            autoComplete="off"
-            value={linkText}
-            onChange={(e) => setLinkText(e.target.value)}
-          />
-          <button type="submit" disabled={claiming || !linkText.trim()}>
-            {claiming ? 'Dodaję…' : 'Dodaj do mojego konta'}
-          </button>
-        </form>
-      </details>
-
-      <DeleteAccount />
+      </div>
     </>
   )
 }
@@ -334,15 +565,22 @@ export default function AccountPage() {
     )
   }
 
+  const initial = (user.email ?? 'G').charAt(0).toLocaleUpperCase('pl-PL')
+
   return (
-    <main className="teacher">
-      <h1>Moje konto</h1>
-      <div className="row">
-        <span className="note">Zalogowano jako {user.email ?? 'konto Google'}</span>
+    <main className="teacher account">
+      <header className="profile">
+        <span className="avatar" aria-hidden="true">
+          {initial}
+        </span>
+        <div className="profile-text">
+          <h1>Moje konto</h1>
+          <p className="note">{user.email ?? 'Konto Google'}</p>
+        </div>
         <button type="button" onClick={() => void signOutAccount()}>
           Wyloguj
         </button>
-      </div>
+      </header>
       <MyContent />
     </main>
   )

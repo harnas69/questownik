@@ -1,3 +1,4 @@
+/* oxlint-disable react/only-export-components */
 import { StrictMode, Suspense, lazy } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'

@@ -4,7 +4,7 @@ import type { KeyboardEvent } from 'react'
 export interface TabDef {
   id: string
   label: string
-  badge?: { count: number; label: string }
+  badge?: { count: number; label: string; tone?: 'accent' | 'neutral' }
 }
 
 interface Props {
@@ -56,7 +56,7 @@ export default function Tabs({ tabs, active, onChange, label, idPrefix = 'tab' }
         >
           {t.label}
           {t.badge && (
-            <span className="tab-badge">
+            <span className={t.badge.tone === 'neutral' ? 'tab-badge neutral' : 'tab-badge'}>
               <span aria-hidden="true">{t.badge.count}</span>
               <span className="sr-only">
                 , {t.badge.count} {t.badge.label}
