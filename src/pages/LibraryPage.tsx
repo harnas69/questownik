@@ -142,31 +142,35 @@ export default function LibraryPage() {
       )}
 
       <form className="library-search" onSubmit={submitSearch} role="search">
-        <label htmlFor="lib-q" className="field-label">
-          Szukaj trasy
-        </label>
-        <input
-          id="lib-q"
-          className="answer"
-          type="search"
-          maxLength={60}
-          placeholder="tytuł, opis lub autor"
-          autoComplete="off"
-          value={queryInput}
-          onChange={(e) => setQueryInput(e.target.value)}
-        />
-        <label htmlFor="lib-sort" className="field-label">
-          Kolejność
-        </label>
-        <select
-          id="lib-sort"
-          value={sortInput}
-          onChange={(e) => setSortInput(e.target.value as LibrarySort)}
-        >
-          <option value="new">Najnowsze</option>
-          <option value="popular">Najczęściej używane</option>
-        </select>
-        <button type="submit" className="big">
+        <div className="ls-field ls-grow">
+          <label htmlFor="lib-q" className="field-label">
+            Szukaj trasy
+          </label>
+          <input
+            id="lib-q"
+            className="answer"
+            type="search"
+            maxLength={60}
+            placeholder="tytuł, opis lub autor"
+            autoComplete="off"
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
+          />
+        </div>
+        <div className="ls-field">
+          <label htmlFor="lib-sort" className="field-label">
+            Kolejność
+          </label>
+          <select
+            id="lib-sort"
+            value={sortInput}
+            onChange={(e) => setSortInput(e.target.value as LibrarySort)}
+          >
+            <option value="new">Najnowsze</option>
+            <option value="popular">Najczęściej używane</option>
+          </select>
+        </div>
+        <button type="submit" className="primary ls-btn">
           Szukaj
         </button>
       </form>

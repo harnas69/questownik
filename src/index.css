@@ -728,3 +728,36 @@ details.danger-zone[open] > summary { margin-bottom: 8px; }
 
 /* Przyciski w formularzach mają zwykły rozmiar, nie pełną szerokość */
 .auth-form > button:not(.big):not(.link-button) { align-self: flex-start; }
+
+/* ===== Poprawki układu: profil, filtry, statusy, wyszukiwarka biblioteki ===== */
+
+/* Wyloguj stoi obok tytułu i nie zawija się do drugiego wiersza */
+.profile { flex-wrap: nowrap; gap: 12px; }
+.profile-text { flex: 1 1 0; }
+.profile > button { flex: 0 0 auto; min-height: 40px; padding: 8px 14px; font-size: 0.95rem; }
+
+/* Szukanie i filtr w jednym rzędzie (także na telefonie) */
+.list-tools { flex-wrap: nowrap; }
+.list-tools input[type="search"] { flex: 1 1 0; min-width: 0; }
+.list-tools select { flex: 0 0 auto; width: auto; max-width: 44%; }
+
+/* Tytuł i plakietka stanu w jednym wierszu */
+.item-head { flex-wrap: nowrap; align-items: flex-start; gap: 10px; }
+.item-head h3 { flex: 1 1 0; min-width: 0; }
+.item-head > .badge, .item-head > .status { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 520px) {
+  .st-more {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap;
+  }
+}
+
+/* Wyszukiwarka biblioteki: kompaktowy rząd */
+.library-search {
+  flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px; max-width: none;
+}
+.ls-field { display: flex; flex-direction: column; gap: 4px; }
+.ls-grow { flex: 1 1 240px; }
+.library-search .field-label { font-size: 0.85rem; color: var(--muted); }
+.library-search select { min-width: 170px; }
+.ls-btn { min-height: 46px; }

@@ -31,10 +31,10 @@ const SEARCH_MIN = 5
 const norm = (s: string) => s.toLocaleLowerCase('pl-PL')
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('pl-PL')
 
-function statusOf(t: TemplateItem): { text: string; cls: string } {
-  if (t.hidden) return { text: 'Ukryta po zgłoszeniach', cls: 'status rejected' }
-  if (t.is_public) return { text: 'Publiczna w bibliotece', cls: 'badge near' }
-  return { text: 'Prywatna', cls: 'badge' }
+function statusOf(t: TemplateItem): { text: string; more: string; cls: string } {
+  if (t.hidden) return { text: 'Ukryta', more: ' po zgłoszeniach', cls: 'status rejected' }
+  if (t.is_public) return { text: 'Publiczna', more: ' w bibliotece', cls: 'badge near' }
+  return { text: 'Prywatna', more: '', cls: 'badge' }
 }
 
 function Empty({
@@ -357,7 +357,10 @@ function MyContent() {
                         <li key={t.id} className="card route-item">
                           <div className="item-head">
                             <h3>{t.title}</h3>
-                            <span className={st.cls}>{st.text}</span>
+                            <span className={st.cls}>
+                              {st.text}
+                              {st.more && <span className="st-more">{st.more}</span>}
+                            </span>
                           </div>
                           <p className="note">
                             {t.points} {plural(t.points, 'punkt', 'punkty', 'punktów')} · {t.games}{' '}
