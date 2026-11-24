@@ -17,13 +17,9 @@ import { forgetUnlocked, isUnlockedLocal, markUnlocked } from '../lib/unlockStor
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 import { PageSkeleton } from '../components/Skeleton'
+import FinishScreen from '../components/FinishScreen'
 
 const PlayMap = lazy(() => import('../components/PlayMap'))
-
-function fmtTime(ms: number): string {
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s`
-}
 
 function fmtDist(m: number): { value: string; unit: string } {
   if (m < 1000) return { value: String(Math.round(m)), unit: 'm' }
@@ -208,42 +204,18 @@ export default function PlayPage() {
 
   // Ekran końcowy
   if (state.currentIdx >= route.points.length) {
-    const duration = state.finishedAt
-      ? fmtTime(Date.parse(state.finishedAt) - Date.parse(state.startedAt))
-      : '—'
     return (
-      <main className="play">
-        <h1 className="sr-only">{route.title}</h1>
-        <section className="card">
-          <FocusHeading>Koniec trasy!</FocusHeading>
-          <p>
-            Drużyna: <strong>{team}</strong>
-          </p>
-          <p className="big-score">
-            {state.score} <span className="unit">/ {total} pkt</span>
-          </p>
-          <p>Czas: {duration}</p>
-          <p>
-            Poprawne odpowiedzi: {state.correctCount} z {route.points.length}
-          </p>
-          {route.points.some((p) => p.taskType === 'photo') && (
-            <p className="note">Punkty za zdjęcia pojawią się po zatwierdzeniu przez nauczyciela.</p>
-          )}
-        </section>
-        <Link className="big secondary" to={`/ranking/${route.code}`}>
-          Zobacz ranking
-        </Link>
-        <button
-          className="big secondary"
-          onClick={() => {
-            clearProgress(route.code)
-            window.location.reload()
-          }}
-        >
-          Zagraj od nowa
-        </button>
-        <Link to="/">Strona główna</Link>
-      </main>
+      <FinishScreen
+        routeId={route.id}
+        routeCode={route.code}
+        routeTitle={route.title}
+        pointCount={route.points.length}
+        totalPoints={total}
+        state={state}
+        team={team}
+        sessionId={sessionId}
+        hasPhoto={route.points.some((p) => p.taskType === 'photo')}
+      />
     )
   }
 

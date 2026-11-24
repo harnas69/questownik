@@ -1,16 +1,50 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import Podium from '../components/Podium'
+import { PageSkeleton } from '../components/Skeleton'
+import { fmtClock } from '../lib/format'
+import { plural } from '../lib/plural'
+import { loadProgress } from '../lib/progress'
+import { durationMs, sortRanking, splitPodium } from '../lib/ranking'
+import type { SessionRow } from '../lib/ranking'
 import { fetchSessions, loadRouteInfo, subscribeSessions } from '../lib/sessionApi'
 import type { RouteInfo } from '../lib/sessionApi'
-import { durationMs, sortRanking } from '../lib/ranking'
-import type { SessionRow } from '../lib/ranking'
-import { PageSkeleton } from '../components/Skeleton'
 
-const MEDALS = ['🥇', '🥈', '🥉']
+interface RowProps {
+  place: number
+  row: SessionRow
+  pointCount: number
+  mine: boolean
+}
 
-function fmt(ms: number): string {
-  const s = Math.floor(ms / 1000)
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+function RankRow({ place, row, pointCount, mine }: RowProps) {
+  const d = durationMs(row)
+  const pct =
+    pointCount > 0 ? Math.min(100, Math.round((row.current_idx / pointCount) * 100)) : 0
+  return (
+    <li className={mine ? 'rk-row mine' : 'rk-row'}>
+      <span className="rk-pos">
+        <span className="sr-only">Miejsce </span>
+        {place}
+      </span>
+      <div className="rk-main">
+        <strong className="rk-name">
+          {row.team_name}
+          {mine && <span className="badge near rk-you">Twoja drużyna</span>}
+        </strong>
+        <span className="rk-sub">
+          Postęp {Math.min(row.current_idx, pointCount)}/{pointCount} ·{' '}
+          {d !== null ? `czas ${fmtClock(d)}` : 'w grze'}
+        </span>
+        <span className="rk-bar" aria-hidden="true">
+          <span style={{ width: `${pct}%` }} />
+        </span>
+      </div>
+      <span className="rk-score">
+        <strong>{row.score}</strong> <span>pkt</span>
+      </span>
+    </li>
+  )
 }
 
 export default function RankingPage() {
@@ -19,6 +53,10 @@ export default function RankingPage() {
   const [rows, setRows] = useState<SessionRow[]>([])
   const [error, setError] = useState<string | null>(null)
   const [projector, setProjector] = useState(false)
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+
+  // Sesja z tego urządzenia (jeśli ktoś grał w tej przeglądarce)
+  const mineId = loadProgress(code.toUpperCase())?.sessionId ?? null
 
   useEffect(() => {
     let cancelled = false
@@ -32,7 +70,9 @@ export default function RankingPage() {
         const refresh = () =>
           fetchSessions(r.id)
             .then((d) => {
-              if (!cancelled) setRows(sortRanking(d))
+              if (cancelled) return
+              setRows(sortRanking(d))
+              setUpdatedAt(new Date())
             })
             .catch((e) => console.error(e))
         await refresh()
@@ -51,6 +91,22 @@ export default function RankingPage() {
     }
   }, [code])
 
+  // Wyjście ze strony kończy pełny ekran
+  useEffect(
+    () => () => {
+      if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    },
+    []
+  )
+
+  const toggleProjector = () => {
+    const next = !projector
+    setProjector(next)
+    const el = document.documentElement
+    if (next && el.requestFullscreen) el.requestFullscreen().catch(() => {})
+    else if (!next && document.fullscreenElement) document.exitFullscreen().catch(() => {})
+  }
+
   if (error) {
     return (
       <main className="play">
@@ -63,52 +119,71 @@ export default function RankingPage() {
   }
   if (!info) return <PageSkeleton label="Wczytuję ranking…" />
 
+  const { podium, rest } = splitPodium(rows)
+  const leader = podium[0]
+
   return (
     <main className={projector ? 'ranking projector' : 'ranking'}>
-      <h1>Ranking: {info.title}</h1>
-      <p className="note">Kod trasy: {info.code}. Ranking odświeża się na żywo.</p>
-      <div className="row">
-        <button type="button" aria-pressed={projector} onClick={() => setProjector((v) => !v)}>
-          Tryb projektora (większe litery)
-        </button>
-      </div>
-
-      {rows.length === 0 ? (
-        <p>Żadna drużyna jeszcze nie wystartowała.</p>
-      ) : (
-        <div className="table-wrap">
-          <table>
-            <caption className="sr-only">Ranking drużyn trasy {info.title}</caption>
-            <thead>
-              <tr>
-                <th scope="col">#</th>
-                <th scope="col">Drużyna</th>
-                <th scope="col">Postęp</th>
-                <th scope="col">Punkty</th>
-                <th scope="col">Czas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => {
-                const d = durationMs(r)
-                return (
-                  <tr key={r.id} className={i < 3 && r.score > 0 ? 'top' : undefined}>
-                    <td>
-                      <span aria-hidden="true">{i < 3 && r.score > 0 ? `${MEDALS[i]} ` : ''}</span>
-                      {i + 1}
-                    </td>
-                    <td>{r.team_name}</td>
-                    <td>
-                      {Math.min(r.current_idx, info.pointCount)}/{info.pointCount}
-                    </td>
-                    <td>{r.score}</td>
-                    <td>{d !== null ? fmt(d) : 'w grze'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+      <header className="rk-head">
+        <div>
+          <p className="eyebrow-s">Ranking · kod {info.code}</p>
+          <h1>{info.title}</h1>
         </div>
+        <button type="button" aria-pressed={projector} onClick={toggleProjector}>
+          {projector ? 'Zamknij tryb projektora' : 'Tryb projektora'}
+        </button>
+      </header>
+
+      <p className="note live">
+        <span className="dot" aria-hidden="true" />
+        <span>
+          Na żywo
+          {updatedAt ? ` · aktualizacja ${updatedAt.toLocaleTimeString('pl-PL')}` : ''} ·{' '}
+          {rows.length} {plural(rows.length, 'drużyna', 'drużyny', 'drużyn')}
+        </span>
+      </p>
+
+      <p className="sr-only" aria-live="polite">
+        {leader ? `Prowadzi drużyna ${leader.team_name}.` : ''}
+      </p>
+
+      {projector && (
+        <p className="join-strip">
+          Dołącz na <strong>{window.location.host}</strong> · kod <strong>{info.code}</strong>
+        </p>
+      )}
+
+      {rows.length === 0 && (
+        <div className="card empty">
+          <span className="empty-icon" aria-hidden="true">
+            ⏳
+          </span>
+          <h2>Czekamy na pierwszą drużynę</h2>
+          <p className="note">
+            Uczniowie dołączają na stronie głównej, wpisując kod gry {info.code}.
+          </p>
+        </div>
+      )}
+
+      {podium.length > 0 && <Podium rows={podium} mineId={mineId} />}
+
+      {rest.length > 0 && (
+        <section aria-labelledby="rk-rest">
+          <h2 id="rk-rest" className={podium.length === 0 ? 'sr-only' : 'rk-rest-title'}>
+            {podium.length === 0 ? 'Drużyny' : 'Pozostałe drużyny'}
+          </h2>
+          <ol className="rk-list" role="list" start={podium.length + 1}>
+            {rest.map((r, i) => (
+              <RankRow
+                key={r.id}
+                place={podium.length + i + 1}
+                row={r}
+                pointCount={info.pointCount}
+                mine={r.id === mineId}
+              />
+            ))}
+          </ol>
+        </section>
       )}
     </main>
   )

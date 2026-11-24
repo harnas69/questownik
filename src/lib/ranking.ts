@@ -24,3 +24,10 @@ export function sortRanking<T extends SessionRow>(rows: T[]): T[] {
     return b.current_idx - a.current_idx
   })
 }
+
+// Podium: do trzech najlepszych drużyn, które mają już punkty. Reszta idzie na listę.
+export function splitPodium<T extends SessionRow>(sorted: T[]): { podium: T[]; rest: T[] } {
+  const firstZero = sorted.findIndex((r) => r.score <= 0)
+  const n = Math.min(3, firstZero === -1 ? sorted.length : firstZero)
+  return { podium: sorted.slice(0, n), rest: sorted.slice(n) }
+}
