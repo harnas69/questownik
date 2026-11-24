@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import type { LibraryFilters } from './libraryFilters'
 import type { DraftPoint, TaskType } from '../types/route'
 
 export interface TemplateItem {
@@ -13,6 +14,9 @@ export interface TemplateItem {
   description: string
   author_name: string
   allow_copy: boolean
+  subject: string | null
+  level: string | null
+  city: string
 }
 
 export interface GameItem {
@@ -38,12 +42,20 @@ export interface LibraryItem {
   title: string
   description: string
   author: string
+  subject: string | null
+  level: string | null
+  city: string
   points: number
   types: Partial<Record<TaskType, number>>
   games: number
   publishedAt: string
   allowCopy: boolean
   mine: boolean
+}
+
+export interface LibraryResult {
+  total: number
+  items: LibraryItem[]
 }
 
 async function call<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
@@ -99,7 +111,10 @@ export async function publishTemplate(
   isPublic: boolean,
   author: string,
   description: string,
-  allowCopy: boolean
+  allowCopy: boolean,
+  subject: string,
+  level: string,
+  city: string
 ): Promise<void> {
   await call('publish_template', {
     p_id: id,
@@ -107,23 +122,31 @@ export async function publishTemplate(
     p_author: author.trim(),
     p_description: description.trim(),
     p_allow_copy: allowCopy,
+    p_subject: subject || null,
+    p_level: level || null,
+    p_city: city.trim(),
   })
 }
 
-export async function searchTemplates(
+export async function searchLibrary(
   query: string,
   sort: LibrarySort,
+  filters: LibraryFilters,
   limit: number,
   offset: number
-): Promise<LibraryItem[]> {
-  return (
-    (await call<LibraryItem[] | null>('search_templates', {
-      p_query: query,
-      p_sort: sort,
-      p_limit: limit,
-      p_offset: offset,
-    })) ?? []
-  )
+): Promise<LibraryResult> {
+  const data = await call<{ total?: number; items?: LibraryItem[] } | null>('search_library', {
+    p_query: query,
+    p_sort: sort,
+    p_limit: limit,
+    p_offset: offset,
+    p_subject: filters.subject || null,
+    p_level: filters.level || null,
+    p_type: filters.type || null,
+    p_size: filters.size || null,
+    p_copy_only: filters.copyOnly,
+  })
+  return { total: Number(data?.total ?? 0), items: data?.items ?? [] }
 }
 
 export function copyTemplate(id: string): Promise<string> {
@@ -132,6 +155,10 @@ export function copyTemplate(id: string): Promise<string> {
 
 export async function reportTemplate(id: string, reason: string): Promise<void> {
   await call('report_template', { p_id: id, p_reason: reason })
+}
+
+export async function deleteMyAccount(): Promise<void> {
+  await call('delete_my_account')
 }
 
 export function accountErrorMessage(e: unknown): string {
@@ -146,6 +173,9 @@ export function accountErrorMessage(e: unknown): string {
   if (msg.includes('report limit')) return 'Wysłano dziś zbyt wiele zgłoszeń. Spróbuj jutro.'
   if (msg.includes('invalid author')) return 'Podaj nazwę autora (od 1 do 40 znaków).'
   if (msg.includes('invalid description')) return 'Opis może mieć najwyżej 300 znaków.'
+  if (msg.includes('invalid subject')) return 'Wybierz przedmiot z listy.'
+  if (msg.includes('invalid level')) return 'Wybierz poziom z listy.'
+  if (msg.includes('invalid city')) return 'Nazwa miasta może mieć najwyżej 40 znaków.'
   if (msg.includes('invalid reason')) return 'Wybierz powód zgłoszenia.'
   if (msg.includes('publish blocked'))
     return 'Publikowanie jest zablokowane: dwie Twoje trasy zostały ukryte po zgłoszeniach. Skontaktuj się z administratorem serwisu.'
@@ -156,9 +186,5 @@ export function accountErrorMessage(e: unknown): string {
   if (msg.includes('already owned')) return 'Ta trasa należy już do innego konta.'
   if (msg.includes('forbidden')) return 'Brak dostępu do tej trasy (mogła zostać wycofana).'
   if (/^(Punkt \d+:|Nieprawidłowy tytuł|Trasa musi)/.test(msg)) return msg
-    return 'Operacja nie powiodła się. Sprawdź internet i spróbuj ponownie.'
-}
-
-export async function deleteMyAccount(): Promise<void> {
-  await call('delete_my_account')
+  return 'Operacja nie powiodła się. Sprawdź internet i spróbuj ponownie.'
 }

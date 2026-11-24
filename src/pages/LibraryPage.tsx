@@ -7,11 +7,14 @@ import {
   copyTemplate,
   launchGame,
   reportTemplate,
-  searchTemplates,
+  searchLibrary,
 } from '../lib/accountApi'
 import type { LibraryItem, LibrarySort } from '../lib/accountApi'
 import { useAuth } from '../lib/auth'
+import { LEVELS, SIZE_OPTIONS, SUBJECTS, TYPE_OPTIONS, labelOf } from '../lib/categories'
 import { summarizeTypes } from '../lib/library'
+import { EMPTY_FILTERS, activeChips, countActive, removeFilter } from '../lib/libraryFilters'
+import type { LibraryFilters } from '../lib/libraryFilters'
 import { plural } from '../lib/plural'
 
 const PAGE = 20
@@ -24,16 +27,23 @@ const REPORT_REASONS = [
   'Inny powód',
 ]
 
+interface Applied {
+  q: string
+  sort: LibrarySort
+  filters: LibraryFilters
+}
+
+const INITIAL: Applied = { q: '', sort: 'new', filters: EMPTY_FILTERS }
+
 export default function LibraryPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
 
   const [queryInput, setQueryInput] = useState('')
-  const [sortInput, setSortInput] = useState<LibrarySort>('new')
-  const [applied, setApplied] = useState<{ q: string; sort: LibrarySort }>({ q: '', sort: 'new' })
+  const [applied, setApplied] = useState<Applied>(INITIAL)
 
   const [items, setItems] = useState<LibraryItem[] | null>(null)
-  const [hasMore, setHasMore] = useState(false)
+  const [total, setTotal] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<{ text: string; editId?: string } | null>(null)
@@ -48,11 +58,11 @@ export default function LibraryPage() {
     const id = ++req.current
     setItems(null)
     setError(null)
-    searchTemplates(applied.q, applied.sort, PAGE, 0)
+    searchLibrary(applied.q, applied.sort, applied.filters, PAGE, 0)
       .then((r) => {
         if (id !== req.current) return
-        setItems(r)
-        setHasMore(r.length === PAGE)
+        setItems(r.items)
+        setTotal(r.total)
       })
       .catch((e) => {
         console.error(e)
@@ -61,9 +71,16 @@ export default function LibraryPage() {
       })
   }, [applied])
 
+  // Zmiana kolejności lub filtra działa od razu i uwzględnia też wpisany tekst
+  const apply = (over: Partial<Applied> = {}) =>
+    setApplied((prev) => ({ ...prev, q: queryInput.trim(), ...over }))
+
+  const setFilter = (patch: Partial<LibraryFilters>) =>
+    apply({ filters: { ...applied.filters, ...patch } })
+
   const submitSearch = (e: FormEvent) => {
     e.preventDefault()
-    setApplied({ q: queryInput.trim(), sort: sortInput })
+    apply()
   }
 
   const loadMore = async () => {
@@ -71,10 +88,10 @@ export default function LibraryPage() {
     const id = ++req.current
     setLoadingMore(true)
     try {
-      const r = await searchTemplates(applied.q, applied.sort, PAGE, items.length)
+      const r = await searchLibrary(applied.q, applied.sort, applied.filters, PAGE, items.length)
       if (id !== req.current) return
-      setItems([...items, ...r])
-      setHasMore(r.length === PAGE)
+      setItems([...items, ...r.items])
+      setTotal(r.total)
     } catch (e) {
       console.error(e)
       setError('Nie udało się wczytać kolejnych tras.')
@@ -128,6 +145,12 @@ export default function LibraryPage() {
     }
   }
 
+  const filters = applied.filters
+  const activeCount = countActive(filters)
+  const chips = activeChips(filters)
+  const hasMore = items !== null && items.length < total
+  const narrowed = applied.q !== '' || activeCount > 0
+
   return (
     <main className="teacher">
       <h1>Biblioteka tras</h1>
@@ -153,7 +176,7 @@ export default function LibraryPage() {
             className="answer"
             type="search"
             maxLength={60}
-            placeholder="tytuł, opis lub autor"
+            placeholder="tytuł, opis, autor lub miasto"
             autoComplete="off"
             value={queryInput}
             onChange={(e) => setQueryInput(e.target.value)}
@@ -165,8 +188,8 @@ export default function LibraryPage() {
           </label>
           <select
             id="lib-sort"
-            value={sortInput}
-            onChange={(e) => setSortInput(e.target.value as LibrarySort)}
+            value={applied.sort}
+            onChange={(e) => apply({ sort: e.target.value as LibrarySort })}
           >
             <option value="new">Najnowsze</option>
             <option value="popular">Najczęściej używane</option>
@@ -176,6 +199,114 @@ export default function LibraryPage() {
           Szukaj
         </button>
       </form>
+
+      <details className="card filters">
+        <summary>
+          Filtry
+          {activeCount > 0 && (
+            <span className="tab-badge">
+              <span aria-hidden="true">{activeCount}</span>
+              <span className="sr-only">, aktywnych: {activeCount}</span>
+            </span>
+          )}
+        </summary>
+        <div className="filters-grid">
+          <label className="f" htmlFor="f-subject">
+            Przedmiot
+            <select
+              id="f-subject"
+              value={filters.subject}
+              onChange={(e) => setFilter({ subject: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {SUBJECTS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="f" htmlFor="f-level">
+            Poziom
+            <select
+              id="f-level"
+              value={filters.level}
+              onChange={(e) => setFilter({ level: e.target.value })}
+            >
+              <option value="">Wszystkie</option>
+              {LEVELS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="f" htmlFor="f-type">
+            Typ zadań
+            <select
+              id="f-type"
+              value={filters.type}
+              onChange={(e) => setFilter({ type: e.target.value })}
+            >
+              <option value="">Dowolny</option>
+              {TYPE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="f" htmlFor="f-size">
+            Długość trasy
+            <select
+              id="f-size"
+              value={filters.size}
+              onChange={(e) => setFilter({ size: e.target.value })}
+            >
+              <option value="">Dowolna</option>
+              {SIZE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <label className="f-check">
+          <input
+            type="checkbox"
+            checked={filters.copyOnly}
+            onChange={(e) => setFilter({ copyOnly: e.target.checked })}
+          />
+          <span>Tylko trasy, które można kopiować do swoich tras</span>
+        </label>
+      </details>
+
+      {chips.length > 0 && (
+        <ul className="active-filters" aria-label="Aktywne filtry">
+          {chips.map((c) => (
+            <li key={c.key}>
+              <button
+                type="button"
+                className="fchip"
+                aria-label={`Usuń filtr: ${c.text}`}
+                onClick={() => apply({ filters: removeFilter(filters, c.key) })}
+              >
+                {c.text} <span aria-hidden="true">✕</span>
+              </button>
+            </li>
+          ))}
+          <li>
+            <button
+              type="button"
+              className="link-button"
+              onClick={() => apply({ filters: EMPTY_FILTERS })}
+            >
+              Wyczyść filtry
+            </button>
+          </li>
+        </ul>
+      )}
 
       {error && (
         <p role="alert" className="bad">
@@ -198,17 +329,32 @@ export default function LibraryPage() {
       {items !== null && (
         <p role="status" className="note">
           {items.length === 0
-            ? applied.q
-              ? 'Nic nie znaleziono. Spróbuj innego hasła.'
+            ? narrowed
+              ? 'Nic nie znaleziono. Zmień hasło albo poluzuj filtry.'
               : 'W bibliotece nie ma jeszcze tras. Opublikuj pierwszą w zakładce „Moje konto”.'
-            : `Wyświetlono ${items.length} ${plural(items.length, 'trasę', 'trasy', 'tras')}${hasMore ? ' (są kolejne)' : ''}.`}
+            : `Znaleziono ${total} ${plural(total, 'trasę', 'trasy', 'tras')}${
+                items.length < total ? `, wyświetlono ${items.length}` : ''
+              }.`}
         </p>
+      )}
+
+      {items !== null && items.length === 0 && activeCount > 0 && (
+        <div>
+          <button type="button" onClick={() => apply({ filters: EMPTY_FILTERS })}>
+            Wyczyść filtry
+          </button>
+        </div>
       )}
 
       {items !== null && items.length > 0 && (
         <ul className="route-list">
           {items.map((it) => {
-            const chips = summarizeTypes(it.types).split(', ').filter(Boolean)
+            const content = summarizeTypes(it.types).split(', ').filter(Boolean)
+            const cats = [
+              labelOf(SUBJECTS, it.subject),
+              labelOf(LEVELS, it.level),
+              it.city || null,
+            ].filter((c): c is string => Boolean(c))
             return (
               <li key={it.id} className="card route-item lib-card">
                 <div className="item-head">
@@ -217,11 +363,16 @@ export default function LibraryPage() {
                 </div>
                 <p className="note">Autor: {it.author}</p>
 
-                <ul className="chips" aria-label="Zawartość trasy">
+                <ul className="chips" aria-label="Kategorie i zawartość trasy">
+                  {cats.map((c) => (
+                    <li key={c} className="chip-s cat">
+                      {c}
+                    </li>
+                  ))}
                   <li className="chip-s">
                     {it.points} {plural(it.points, 'punkt', 'punkty', 'punktów')}
                   </li>
-                  {chips.map((c) => (
+                  {content.map((c) => (
                     <li key={c} className="chip-s">
                       {c}
                     </li>

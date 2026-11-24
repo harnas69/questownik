@@ -869,3 +869,35 @@ body:has(.ranking.projector) .site-footer { display: none; }
 .tile { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 6px; background: var(--surface-2); }
 .tile dt { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
 .tile dd { margin: 0; font-size: 1.25rem; font-weight: 800; }
+
+/* ===== 10D: filtry i kategorie biblioteki ===== */
+
+.filters { padding: 0 16px; gap: 0; }
+.filters > summary {
+  min-height: 48px; display: flex; align-items: center; gap: 8px;
+  cursor: pointer; font-weight: 600;
+}
+.filters[open] { padding-bottom: 16px; }
+.filters-grid {
+  display: grid; gap: 12px; margin-top: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.filters .f { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.filters .f-check { display: flex; gap: 10px; align-items: center; margin-top: 12px; }
+
+.active-filters {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+}
+.fchip {
+  min-height: 36px; padding: 4px 12px; border-radius: 999px;
+  font-size: 0.9rem; background: var(--surface-2);
+}
+
+.chip-s.cat {
+  background: color-mix(in srgb, var(--primary) 28%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--border));
+}
+
+.pf-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.pf-field { display: flex; flex-direction: column; gap: 4px; }
