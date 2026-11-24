@@ -359,7 +359,9 @@ function MyContent() {
                             <h3>{t.title}</h3>
                             <span className={st.cls}>
                               {st.text}
-                              {st.more && <span className="st-more">{st.more}</span>}
+                              {st.more && (
+                                <span className="st-more">{'\u00A0' + st.more.trim()}</span>
+                              )}
                             </span>
                           </div>
                           <p className="note">
@@ -442,7 +444,7 @@ function MyContent() {
                       id="gq"
                       type="search"
                       className="answer"
-                      placeholder="Szukaj po tytule lub kodzie…"
+                      placeholder="Szukaj gry…"
                       autoComplete="off"
                       value={gq}
                       onChange={(e) => setGq(e.target.value)}

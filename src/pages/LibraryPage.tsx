@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BlockSkeleton } from '../components/Skeleton'
 import {
   accountErrorMessage,
   copyTemplate,
@@ -12,7 +13,6 @@ import type { LibraryItem, LibrarySort } from '../lib/accountApi'
 import { useAuth } from '../lib/auth'
 import { summarizeTypes } from '../lib/library'
 import { plural } from '../lib/plural'
-import { BlockSkeleton } from '../components/Skeleton'
 
 const PAGE = 20
 
@@ -56,7 +56,8 @@ export default function LibraryPage() {
       })
       .catch((e) => {
         console.error(e)
-        if (id === req.current) setError('Nie udało się wczytać biblioteki. Sprawdź internet i spróbuj ponownie.')
+        if (id === req.current)
+          setError('Nie udało się wczytać biblioteki. Sprawdź internet i spróbuj ponownie.')
       })
   }, [applied])
 
@@ -137,7 +138,8 @@ export default function LibraryPage() {
 
       {!user && (
         <p className="note">
-          Przeglądać może każdy. Aby uruchomić grę lub skopiować trasę, <Link to="/konto">zaloguj się</Link>.
+          Przeglądać może każdy. Aby uruchomić grę lub skopiować trasę,{' '}
+          <Link to="/konto">zaloguj się</Link>.
         </p>
       )}
 
@@ -180,10 +182,16 @@ export default function LibraryPage() {
           {error}
         </p>
       )}
-      <p role="status" className="notice">
-        {notice?.text}{' '}
-        {notice?.editId && <Link to={`/edytor/${notice.editId}`}>Edytuj kopię</Link>}
-      </p>
+
+      <div role="status" className={notice ? 'banner good' : 'sr-only'}>
+        {notice?.text}
+        {notice?.editId && (
+          <>
+            {' '}
+            <Link to={`/edytor/${notice.editId}`}>Edytuj kopię</Link>
+          </>
+        )}
+      </div>
 
       {items === null && !error && <BlockSkeleton rows={3} label="Wczytuję bibliotekę…" />}
 
@@ -199,75 +207,105 @@ export default function LibraryPage() {
 
       {items !== null && items.length > 0 && (
         <ul className="route-list">
-          {items.map((it) => (
-            <li key={it.id} className="card route-item">
-              <h2 className="route-title">{it.title}</h2>
-              <p className="note">
-                Autor: {it.author} · {it.points} {plural(it.points, 'punkt', 'punkty', 'punktów')}{' '}
-                · użyta w {it.games} {plural(it.games, 'grze', 'grach', 'grach')}
-              </p>
-              {summarizeTypes(it.types) && <p className="note">Zadania: {summarizeTypes(it.types)}</p>}
-              {it.description && <p>{it.description}</p>}
-
-              {user ? (
-                <div className="row">
-                  <button type="button" disabled={busyId === it.id} onClick={() => void launch(it)}>
-                    {busyId === it.id ? 'Chwileczkę…' : 'Uruchom grę'}
-                  </button>
-                  {it.mine ? (
-                    <Link className="btn-link" to={`/edytor/${it.id}`}>
-                      Edytuj (Twoja trasa)
-                    </Link>
-                  ) : (
-                    <>
-                      {it.allowCopy && (
-                        <button type="button" disabled={busyId === it.id} onClick={() => void copy(it)}>
-                          Kopiuj do moich tras
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReportingId(reportingId === it.id ? null : it.id)
-                          setReason(REPORT_REASONS[0])
-                        }}
-                        aria-expanded={reportingId === it.id}
-                      >
-                        Zgłoś
-                      </button>
-                    </>
-                  )}
+          {items.map((it) => {
+            const chips = summarizeTypes(it.types).split(', ').filter(Boolean)
+            return (
+              <li key={it.id} className="card route-item lib-card">
+                <div className="item-head">
+                  <h2 className="route-title">{it.title}</h2>
+                  {it.mine && <span className="badge">Twoja trasa</span>}
                 </div>
-              ) : (
-                <p className="note">
-                  <Link to="/konto">Zaloguj się</Link>, aby uruchomić grę z tej trasy.
-                </p>
-              )}
+                <p className="note">Autor: {it.author}</p>
 
-              {reportingId === it.id && (
-                <form className="publish-form" onSubmit={(e) => void report(e, it)}>
-                  <label htmlFor={`reason-${it.id}`} className="field-label">
-                    Powód zgłoszenia
-                  </label>
-                  <select id={`reason-${it.id}`} value={reason} onChange={(e) => setReason(e.target.value)}>
-                    {REPORT_REASONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
+                <ul className="chips" aria-label="Zawartość trasy">
+                  <li className="chip-s">
+                    {it.points} {plural(it.points, 'punkt', 'punkty', 'punktów')}
+                  </li>
+                  {chips.map((c) => (
+                    <li key={c} className="chip-s">
+                      {c}
+                    </li>
+                  ))}
+                  <li className="chip-s">
+                    użyta w {it.games} {plural(it.games, 'grze', 'grach', 'grach')}
+                  </li>
+                </ul>
+
+                {it.description && <p className="lib-desc">{it.description}</p>}
+
+                {user ? (
                   <div className="row">
-                    <button type="submit" disabled={busyId === it.id}>
-                      Wyślij zgłoszenie
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={busyId === it.id}
+                      onClick={() => void launch(it)}
+                    >
+                      {busyId === it.id ? 'Chwileczkę…' : 'Uruchom grę'}
                     </button>
-                    <button type="button" onClick={() => setReportingId(null)}>
-                      Anuluj
-                    </button>
+                    {it.mine ? (
+                      <Link className="btn-link" to={`/edytor/${it.id}`}>
+                        Edytuj
+                      </Link>
+                    ) : (
+                      <>
+                        {it.allowCopy && (
+                          <button
+                            type="button"
+                            disabled={busyId === it.id}
+                            onClick={() => void copy(it)}
+                          >
+                            Kopiuj do moich tras
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReportingId(reportingId === it.id ? null : it.id)
+                            setReason(REPORT_REASONS[0])
+                          }}
+                          aria-expanded={reportingId === it.id}
+                        >
+                          Zgłoś
+                        </button>
+                      </>
+                    )}
                   </div>
-                </form>
-              )}
-            </li>
-          ))}
+                ) : (
+                  <p className="note">
+                    <Link to="/konto">Zaloguj się</Link>, aby uruchomić grę z tej trasy.
+                  </p>
+                )}
+
+                {reportingId === it.id && (
+                  <form className="publish-form" onSubmit={(e) => void report(e, it)}>
+                    <label htmlFor={`reason-${it.id}`} className="field-label">
+                      Powód zgłoszenia
+                    </label>
+                    <select
+                      id={`reason-${it.id}`}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                    >
+                      {REPORT_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="row">
+                      <button type="submit" disabled={busyId === it.id}>
+                        Wyślij zgłoszenie
+                      </button>
+                      <button type="button" onClick={() => setReportingId(null)}>
+                        Anuluj
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
 
