@@ -1,25 +1,32 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import ArrivalFeedback from '../components/ArrivalFeedback'
+import FinishScreen from '../components/FinishScreen'
 import FocusHeading from '../components/FocusHeading'
 import ProgressBar from '../components/ProgressBar'
 import QrUnlock from '../components/QrUnlock'
+import { PageSkeleton } from '../components/Skeleton'
 import TaskView from '../components/TaskView'
 import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
+import { isNetworkError } from '../lib/network'
 import { plural } from '../lib/plural'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
 import { extractToken } from '../lib/qr'
 import { createSession, fetchSessionState, isGameClosed } from '../lib/sessionApi'
 import { forgetUnlocked, isUnlockedLocal, markUnlocked } from '../lib/unlockStore'
+import { useOnline } from '../lib/useOnline'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
-import { PageSkeleton } from '../components/Skeleton'
-import FinishScreen from '../components/FinishScreen'
 
 const PlayMap = lazy(() => import('../components/PlayMap'))
+
+const MSG_NO_SNAPSHOT =
+  'Brak połączenia z internetem. Nie mamy zapisanego stanu tej gry na tym urządzeniu, więc nie da się jej wznowić offline. Połącz się z internetem i odśwież stronę.'
+const MSG_NO_ROUTE_OFFLINE =
+  'Brak połączenia z internetem. Tej trasy nie ma jeszcze zapisanej na tym urządzeniu, więc nie da się jej wczytać offline. Połącz się z internetem i odśwież stronę.'
 
 function fmtDist(m: number): { value: string; unit: string } {
   if (m < 1000) return { value: String(Math.round(m)), unit: 'm' }
@@ -29,13 +36,15 @@ function fmtDist(m: number): { value: string; unit: string } {
 export default function PlayPage() {
   const { code = '' } = useParams()
   const [search] = useSearchParams()
-  const debug = search.get('debug') === '1'
+  // Tryb debug istnieje tylko w wersji deweloperskiej: na produkcji ?debug=1 nic nie robi
+  const debug = import.meta.env.DEV && search.get('debug') === '1'
 
   const [route, setRoute] = useState<GameRoute | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [team, setTeam] = useState('')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [state, setState] = useState<SessionState | null>(null)
+  const [stale, setStale] = useState(false) // pokazujemy ostatni znany stan, bez potwierdzenia z serwera
   const [starting, setStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
   const [pos, setPos] = useState<GeoPos | null>(null)
@@ -48,7 +57,9 @@ export default function PlayPage() {
     extractToken(window.location.hash)
   )
 
+  const online = useOnline()
   const started = sessionId !== null && state !== null
+  const routeCode = route?.code
 
   useWakeLock(started)
 
@@ -63,33 +74,92 @@ export default function PlayPage() {
     }
   }, [])
 
-  // 1. Pobierz trasę i odtwórz postęp z serwera
+  // 1. Pobierz trasę i odtwórz postęp (z serwera albo, bez internetu, z ostatniego znanego stanu)
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       const r = await loadRoute(code.toUpperCase())
       const saved = loadProgress(r.code)
       if (saved) {
-        const s = await fetchSessionState(saved.sessionId)
-        if (cancelled) return
-        if (s) {
-          setTeam(s.teamName)
+        try {
+          const s = await fetchSessionState(saved.sessionId)
+          if (cancelled) return
+          if (s) {
+            setTeam(s.teamName)
+            setSessionId(saved.sessionId)
+            setState(s)
+          } else {
+            clearProgress(r.code)
+          }
+        } catch (e) {
+          if (cancelled) return
+          if (!isNetworkError(e)) throw e
+          if (!saved.snapshot) {
+            setLoadError(MSG_NO_SNAPSHOT)
+            return
+          }
+          setTeam(saved.team)
           setSessionId(saved.sessionId)
-          setState(s)
-        } else {
-          clearProgress(r.code)
+          setState(saved.snapshot)
+          setStale(true)
         }
       }
       if (!cancelled) setRoute(r)
     })().catch((e) => {
-      if (!cancelled) setLoadError(e instanceof Error ? e.message : 'Nie udało się wczytać trasy.')
+      if (cancelled) return
+      console.error(e)
+      setLoadError(
+        isNetworkError(e)
+          ? MSG_NO_ROUTE_OFFLINE
+          : e instanceof Error
+            ? e.message
+            : 'Nie udało się wczytać trasy.'
+      )
     })
     return () => {
       cancelled = true
     }
   }, [code])
 
-  // 2. Śledź pozycję GPS
+  // 2. Zapamiętuj ostatni znany stan sesji (nie nadpisuj go, dopóki pokazujemy stary)
+  useEffect(() => {
+    if (!routeCode || !sessionId || !state || stale) return
+    saveProgress(routeCode, { sessionId, team: state.teamName, snapshot: state })
+  }, [routeCode, sessionId, state, stale])
+
+  // 3. Gdy sieć wraca, zsynchronizuj stan z serwerem
+  useEffect(() => {
+    if (!stale || !sessionId || !routeCode) return
+    let cancelled = false
+    const sync = async () => {
+      try {
+        const s = await fetchSessionState(sessionId)
+        if (cancelled) return
+        if (s) {
+          setState(s)
+          setStale(false)
+        } else {
+          // sesja została usunięta na serwerze: wracamy na ekran startowy
+          clearProgress(routeCode)
+          setSessionId(null)
+          setState(null)
+          setStale(false)
+        }
+      } catch (e) {
+        if (!isNetworkError(e)) console.error(e)
+      }
+    }
+    if (online) void sync()
+    const timer = window.setInterval(() => {
+      if (navigator.onLine) void sync()
+    }, 8000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [stale, sessionId, routeCode, online])
+
+  // 4. Śledź pozycję GPS
   useEffect(() => {
     if (!started) return
     if (!navigator.geolocation) {
@@ -118,6 +188,9 @@ export default function PlayPage() {
         <p role="alert" className="bad">
           {loadError}
         </p>
+        <button type="button" onClick={() => window.location.reload()}>
+          Odśwież stronę
+        </button>
         <Link to="/">Wróć na stronę główną</Link>
       </main>
     )
@@ -265,6 +338,13 @@ export default function PlayPage() {
       </header>
 
       <ProgressBar done={state.currentIdx} total={route.points.length} />
+
+      {stale && (
+        <p role="status" className="banner warn">
+          Brak połączenia z serwerem. Pokazujemy ostatni znany stan gry. Gdy internet wróci,
+          zsynchronizujemy go automatycznie, a odpowiedzi wyślesz dopiero wtedy.
+        </p>
+      )}
 
       {inRange ? (
         <>

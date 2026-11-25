@@ -901,3 +901,17 @@ body:has(.ranking.projector) .site-footer { display: none; }
 
 .pf-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .pf-field { display: flex; flex-direction: column; gap: 4px; }
+
+/* ===== Grupa A: ostrzeżenia, szkic, ekran błędu ===== */
+.banner.warn {
+  color: var(--text);
+  background: color-mix(in srgb, var(--primary) 22%, var(--surface));
+  border-color: var(--primary);
+}
+.draft-banner { display: flex; flex-direction: column; gap: 10px; }
+.draft-banner p { margin: 0; }
+.error-box { display: flex; flex-direction: column; gap: 10px; }
+.error-detail {
+  margin: 0; padding: 10px; overflow-x: auto; font-size: 0.8rem;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}

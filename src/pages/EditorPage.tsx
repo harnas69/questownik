@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import type { Map as LeafletMap } from 'leaflet'
 import MapView from '../components/MapView'
 import PointForm from '../components/PointForm'
@@ -10,6 +10,9 @@ import { PageSkeleton } from '../components/Skeleton'
 import { accountErrorMessage, getTemplate, launchGame, saveTemplate } from '../lib/accountApi'
 import { useAuth } from '../lib/auth'
 import { useConfirm } from '../lib/confirm'
+import { clearDraft, draftKey, fingerprint, loadDraft, saveDraft } from '../lib/draft'
+import type { Draft } from '../lib/draft'
+import { plural } from '../lib/plural'
 import { moveItem, newPoint, validatePoints } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
 import { isForbidden } from '../lib/teacherApi'
@@ -17,17 +20,45 @@ import { useMediaQuery } from '../lib/useMediaQuery'
 import type { DraftPoint } from '../types/route'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const EMPTY = JSON.stringify({ title: '', points: [], allowManual: false })
+const EMPTY = fingerprint({ title: '', points: [], allowManual: false })
 
 type LoadState = 'loading' | 'ready' | 'denied' | 'error'
 
+function formatWhen(ts: number): string {
+  return new Date(ts).toLocaleString('pl-PL', { dateStyle: 'short', timeStyle: 'short' })
+}
+
 export default function EditorPage() {
+  const auth = useAuth()
+  const { id } = useParams()
+
+  if (auth.loading) return <PageSkeleton label="Sprawdzam logowanie…" />
+
+  if (!auth.user) {
+    return (
+      <main className="play">
+        <h1>Edytor tras</h1>
+        <section className="card">
+          <p>
+            Aby tworzyć trasy i prowadzić gry, zaloguj się na konto nauczyciela. Uczniowie grają
+            bez logowania.
+          </p>
+          <Link className="big" to="/konto">
+            Zaloguj się lub załóż konto
+          </Link>
+        </section>
+      </main>
+    )
+  }
+
+  return <Editor key={id ?? 'new'} uid={auth.user.id} />
+}
+
+function Editor({ uid }: { uid: string }) {
   const { id: editParam } = useParams()
   const navigate = useNavigate()
-  const auth = useAuth()
   const askConfirm = useConfirm()
   const isMobile = useMediaQuery('(max-width: 800px)')
-  const uid = auth.user?.id
 
   const editing = editParam !== undefined
   const validId = editing && UUID.test(editParam)
@@ -38,6 +69,11 @@ export default function EditorPage() {
   )
   const [saved, setSaved] = useState(false)
   const [baseline, setBaseline] = useState(EMPTY)
+  const [draftOffer, setDraftOffer] = useState<Draft | null>(() => {
+    if (editing) return null // przy edycji istniejącej trasy szkic sprawdzamy po jej wczytaniu
+    const d = loadDraft(draftKey(uid, null))
+    return d && fingerprint(d) !== EMPTY ? d : null
+  })
 
   const [title, setTitle] = useState('')
   const [points, setPoints] = useState<DraftPoint[]>([])
@@ -52,7 +88,14 @@ export default function EditorPage() {
   const mapRef = useRef<LeafletMap | null>(null)
   const countRef = useRef(0)
 
-  const dirty = JSON.stringify({ title, points, allowManual }) !== baseline
+  const storageKey = draftKey(uid, templateId)
+  const dirty = fingerprint({ title, points, allowManual }) !== baseline
+
+  // Najnowsze wartości dla obsługi blokady nawigacji
+  const latest = useRef({ storageKey, title, points, allowManual, dirty, draftOffer })
+  useEffect(() => {
+    latest.current = { storageKey, title, points, allowManual, dirty, draftOffer }
+  })
 
   useEffect(() => {
     countRef.current = points.length
@@ -60,18 +103,24 @@ export default function EditorPage() {
 
   // Wczytanie trasy do edycji
   useEffect(() => {
-    if (!validId || !uid || !editParam) return
+    if (!validId || !editParam) return
     let cancelled = false
     getTemplate(editParam)
       .then((r) => {
         if (cancelled) return
+        const base = fingerprint({
+          title: r.title,
+          points: r.points,
+          allowManual: r.allowManual,
+        })
         setTitle(r.title)
         setPoints(r.points)
         setAllowManual(r.allowManual)
         setSelected(r.points.length > 0 ? 0 : null)
-        setBaseline(
-          JSON.stringify({ title: r.title, points: r.points, allowManual: r.allowManual })
-        )
+        setBaseline(base)
+        const d = loadDraft(draftKey(uid, editParam))
+        if (d && fingerprint(d) !== base) setDraftOffer(d)
+        else if (d) clearDraft(draftKey(uid, editParam))
         setLoadState('ready')
       })
       .catch((e) => {
@@ -84,13 +133,51 @@ export default function EditorPage() {
     }
   }, [validId, uid, editParam])
 
-  // Ostrzeżenie przed zamknięciem karty z niezapisanymi zmianami
+  // Autozapis szkicu (około sekundy po ostatniej zmianie). Gdy czeka starszy szkic, nie nadpisujemy go.
+  useEffect(() => {
+    if (!dirty || draftOffer || saved) return
+    const t = window.setTimeout(() => {
+      saveDraft(storageKey, { title, points, allowManual })
+    }, 1000)
+    return () => window.clearTimeout(t)
+  }, [dirty, draftOffer, saved, storageKey, title, points, allowManual])
+
+  // Zamknięcie lub odświeżenie karty z niezapisanymi zmianami
   useEffect(() => {
     if (!dirty) return
     const handler = (e: BeforeUnloadEvent) => e.preventDefault()
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
+
+  // Przejście na inną stronę aplikacji (link, przycisk Wstecz) z niezapisanymi zmianami
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname
+  )
+  const confirming = useRef(false)
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked' || confirming.current) return
+    confirming.current = true
+    const { proceed, reset } = blocker
+    const cur = latest.current
+    // Zapis bez czekania na debounce, żeby ostatnie zmiany nie przepadły
+    const draftSaved = cur.dirty && !cur.draftOffer ? saveDraft(cur.storageKey, cur) : false
+    void askConfirm({
+      title: 'Opuścić edytor?',
+      message: draftSaved
+        ? 'Masz niezapisane zmiany w trasie. Zachowaliśmy je jako szkic na tym urządzeniu: gdy wrócisz do edytora, zaproponujemy ich przywrócenie.'
+        : 'Masz niezapisane zmiany w trasie. Po wyjściu zostaną utracone.',
+      confirmLabel: 'Wyjdź z edytora',
+      cancelLabel: 'Zostań w edytorze',
+      danger: !draftSaved,
+    }).then((ok) => {
+      confirming.current = false
+      if (ok) proceed()
+      else reset()
+    })
+  }, [blocker, askConfirm])
 
   const add = (lat: number, lng: number) => {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
@@ -165,6 +252,22 @@ export default function EditorPage() {
     setSheetOpen(false)
   }
 
+  const restoreDraft = () => {
+    if (!draftOffer) return
+    setTitle(draftOffer.title)
+    setPoints(draftOffer.points)
+    setAllowManual(draftOffer.allowManual)
+    setSelected(draftOffer.points.length > 0 ? 0 : null)
+    setSheetOpen(false)
+    setError(null)
+    setDraftOffer(null)
+  }
+
+  const discardDraft = () => {
+    clearDraft(storageKey)
+    setDraftOffer(null)
+  }
+
   const startNew = () => {
     if (editing) {
       navigate('/edytor')
@@ -196,8 +299,9 @@ export default function EditorPage() {
       setError(null)
       setSaving(true)
       const id = await saveTemplate(templateId, title, points, allowManual)
+      clearDraft(storageKey) // klucz sprzed zapisu: dla nowej trasy to szkic "new"
       setTemplateId(id)
-      setBaseline(JSON.stringify({ title, points, allowManual }))
+      setBaseline(fingerprint({ title, points, allowManual }))
       setSaved(true)
     } catch (e) {
       console.error(e)
@@ -249,26 +353,7 @@ export default function EditorPage() {
     e.target.value = ''
   }
 
-  // ---- Logowanie i wczytywanie ----
-  if (auth.loading) return <PageSkeleton label="Sprawdzam logowanie…" />
-
-  if (!auth.user) {
-    return (
-      <main className="play">
-        <h1>Edytor tras</h1>
-        <section className="card">
-          <p>
-            Aby tworzyć trasy i prowadzić gry, zaloguj się na konto nauczyciela. Uczniowie grają
-            bez logowania.
-          </p>
-          <Link className="big" to="/konto">
-            Zaloguj się lub załóż konto
-          </Link>
-        </section>
-      </main>
-    )
-  }
-
+  // ---- Wczytywanie edycji ----
   if (editing && loadState === 'loading') return <PageSkeleton label="Wczytuję trasę do edycji…" />
 
   if (editing && loadState === 'denied') {
@@ -347,6 +432,23 @@ export default function EditorPage() {
       ? 'Dodaj co najmniej jeden punkt na mapie.'
       : null
 
+  const draftBanner = draftOffer ? (
+    <div className="banner warn draft-banner" role="region" aria-label="Niezapisany szkic">
+      <p>
+        Znaleziono niezapisany szkic z {formatWhen(draftOffer.savedAt)} ({draftOffer.points.length}{' '}
+        {plural(draftOffer.points.length, 'punkt', 'punkty', 'punktów')}). Chcesz go przywrócić?
+      </p>
+      <div className="row">
+        <button type="button" className="primary" onClick={restoreDraft}>
+          Przywróć szkic
+        </button>
+        <button type="button" onClick={discardDraft}>
+          Odrzuć szkic
+        </button>
+      </div>
+    </div>
+  ) : null
+
   const mapEl = (
     <div className="map-holder">
       <MapView
@@ -373,6 +475,8 @@ export default function EditorPage() {
             <Link to="/konto">Moje trasy</Link>
           </p>
         )}
+
+        {draftBanner}
 
         <input
           className="answer"
@@ -473,7 +577,7 @@ export default function EditorPage() {
     )
   }
 
-  // ===== Komputer: układ bez zmian =====
+  // ===== Komputer =====
   return (
     <main className="editor">
       <h1>{templateId ? 'Edycja trasy' : 'Nowa trasa'}</h1>
@@ -483,6 +587,8 @@ export default function EditorPage() {
           <Link to="/konto">Wróć do moich tras</Link>
         </p>
       )}
+
+      {draftBanner}
 
       <div className="row">
         <input

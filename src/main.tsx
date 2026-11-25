@@ -1,15 +1,16 @@
-/* oxlint-disable react/only-export-components */
 import { StrictMode, Suspense, lazy } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { Outlet, RouterProvider, createBrowserRouter } from 'react-router-dom'
 import ConfirmProvider from './components/ConfirmProvider'
+import ErrorBoundary, { RouteErrorFallback } from './components/ErrorBoundary'
 import Layout from './components/Layout'
 import OfflineBanner from './components/OfflineBanner'
+import { PageSkeleton } from './components/Skeleton'
 import HomePage from './pages/HomePage'
+import NotFoundPage from './pages/NotFoundPage'
 import PlayPage from './pages/PlayPage'
 import './index.css'
-import { PageSkeleton } from './components/Skeleton'
 
 const EditorPage = lazy(() => import('./pages/EditorPage'))
 const RankingPage = lazy(() => import('./pages/RankingPage'))
@@ -21,34 +22,52 @@ const PrivacyPage = lazy(() => import('./pages/PrivacyPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const QrSheetPage = lazy(() => import('./pages/QrSheetPage'))
 
-
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
 }
 
+// Korzeń aplikacji: okna potwierdzeń, komunikat o braku internetu i ErrorBoundary wokół wszystkich stron
+function Root() {
+  return (
+    <ConfirmProvider>
+      <OfflineBanner />
+      <ErrorBoundary>
+        <Outlet />
+      </ErrorBoundary>
+    </ConfirmProvider>
+  )
+}
+
+const router = createBrowserRouter([
+  {
+    element: <Root />,
+    errorElement: <RouteErrorFallback />,
+    children: [
+      {
+        element: <Layout />,
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/konto', element: <Lazy><AccountPage /></Lazy> },
+          { path: '/konto/reset', element: <Lazy><ResetPasswordPage /></Lazy> },
+          { path: '/biblioteka', element: <Lazy><LibraryPage /></Lazy> },
+          { path: '/prywatnosc', element: <Lazy><PrivacyPage /></Lazy> },
+          { path: '/admin', element: <Lazy><AdminPage /></Lazy> },
+          { path: '/edytor', element: <Lazy><EditorPage key="new" /></Lazy> },
+          { path: '/edytor/:id', element: <Lazy><EditorPage key="edit" /></Lazy> },
+          { path: '/gra/:code', element: <PlayPage /> },
+          { path: '/ranking/:code', element: <Lazy><RankingPage /></Lazy> },
+          { path: '/nauczyciel/:code', element: <Lazy><TeacherPage /></Lazy> },
+          { path: '/nauczyciel/:code/qr', element: <Lazy><QrSheetPage /></Lazy> },
+          { path: '*', element: <NotFoundPage /> },
+        ],
+      },
+    ],
+  },
+])
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <ConfirmProvider>
-        <OfflineBanner />
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/konto" element={<Lazy><AccountPage /></Lazy>} />
-            <Route path="/konto/reset" element={<Lazy><ResetPasswordPage /></Lazy>} />
-            <Route path="/biblioteka" element={<Lazy><LibraryPage /></Lazy>} />
-            <Route path="/prywatnosc" element={<Lazy><PrivacyPage /></Lazy>} />
-            <Route path="/admin" element={<Lazy><AdminPage /></Lazy>} />
-            <Route path="/edytor" element={<Lazy><EditorPage key="new" /></Lazy>} />
-            <Route path="/edytor/:id" element={<Lazy><EditorPage key="edit" /></Lazy>} />
-            <Route path="/gra/:code" element={<PlayPage />} />
-            <Route path="/ranking/:code" element={<Lazy><RankingPage /></Lazy>} />
-            <Route path="/nauczyciel/:code" element={<Lazy><TeacherPage /></Lazy>} />
-            <Route path="/nauczyciel/:code/qr" element={<Lazy><QrSheetPage /></Lazy>} />
-          </Route>
-        </Routes>
-      </ConfirmProvider>
-    </BrowserRouter>
+    <RouterProvider router={router} />
   </StrictMode>
 )
 

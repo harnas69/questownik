@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { PUBLIC_POINT_SELECT, mapPoint } from './gamePoints'
 import type { GameRoute } from '../types/game'
 
 class RouteNotFoundError extends Error {}
@@ -14,9 +15,10 @@ async function fetchRoute(code: string): Promise<GameRoute> {
   if (error) throw error
   if (!route) throw new RouteNotFoundError('Nie znaleziono trasy o takim kodzie.')
 
+  // Jawna lista kolumn: gracz nie dostaje niczego poza tym, co potrzebne do gry
   const { data: pts, error: pointsError } = await supabase
     .from('points')
-    .select('*')
+    .select(PUBLIC_POINT_SELECT)
     .eq('route_id', route.id)
     .order('position')
   if (pointsError) throw pointsError
@@ -26,17 +28,7 @@ async function fetchRoute(code: string): Promise<GameRoute> {
     code: route.code,
     title: route.title,
     allowManual: Boolean(route.allow_manual),
-    points: (pts ?? []).map((p) => ({
-      id: p.id,
-      lat: p.lat,
-      lng: p.lng,
-      radiusM: p.radius_m,
-      taskType: p.task_type,
-      content: { prompt: '', ...p.content },
-      score: p.score,
-      hint: p.hint,
-      unlock: p.unlock === 'qr' ? 'qr' : 'gps',
-    })),
+    points: (pts ?? []).map(mapPoint),
   }
 }
 
