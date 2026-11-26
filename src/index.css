@@ -227,7 +227,7 @@ input, select, textarea {
   border: 1.5px solid var(--border-strong); border-radius: 12px;
   padding: 11px 14px; min-height: 46px; max-width: 100%;
 }
-input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
+input::placeholder, textarea::placeholder { color: var(--placeholder); opacity: 1; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { border-color: var(--focus); }
 input[type="range"] { padding: 0; min-height: 32px; accent-color: var(--text); }
 input[type="radio"] { width: 1.35rem; height: 1.35rem; min-height: auto; padding: 0; flex: 0 0 auto; accent-color: var(--text); }
@@ -914,4 +914,107 @@ body:has(.ranking.projector) .site-footer { display: none; }
 .error-detail {
   margin: 0; padding: 10px; overflow-x: auto; font-size: 0.8rem;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+
+/* ===== Grupa B: tokeny kontrastu (B1) ===== */
+:root {
+  --control-border: #8a8678;
+  --placeholder: #686c77;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --control-border: #6e7788;
+    --placeholder: #9aa1ad;
+  }
+}
+:root[data-theme="dark"] {
+  --control-border: #6e7788;
+  --placeholder: #9aa1ad;
+}
+
+/* Ramki kontrolek (3:1). --border-strong zostaje dla elementów dekoracyjnych. */
+button, .btn-link, .file { border-color: var(--control-border); }
+button.big.secondary, a.big.secondary { border-color: var(--control-border); }
+input, select, textarea { border-color: var(--control-border); }
+.opt { border-color: var(--control-border); }
+input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"] {
+  border-color: var(--bad);
+  border-width: 2px;
+}
+
+/* ===== Grupa B: formularze, błędy pól, hasło ===== */
+.task-form { display: flex; flex-direction: column; gap: 12px; }
+.options legend.prompt { padding: 0; margin-bottom: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-error { margin: 2px 0 0; }
+.opt-row { display: flex; gap: 8px; align-items: center; margin-top: 6px; }
+.opt-row input[type="text"] { flex: 1 1 0; min-width: 0; }
+.opt-remove { flex: 0 0 auto; }
+.pw-field { display: flex; gap: 8px; align-items: stretch; }
+.pw-field input { flex: 1 1 0; width: auto; min-width: 0; }
+.pw-toggle { flex: 0 0 auto; }
+.pw-toggle[aria-pressed="true"] { background: var(--surface-2); border-color: var(--text); }
+
+.error-summary {
+  display: flex; flex-direction: column; gap: 6px; padding: 12px 14px;
+  border: 2px solid var(--bad); border-radius: var(--radius); background: var(--bad-bg);
+}
+.error-summary h2 { font-size: 1.05rem; color: var(--bad); }
+.error-summary ul { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 2px; }
+.error-summary .link-button { text-align: left; min-height: 32px; }
+
+/* Dolny panel edytora na telefonie z listą błędów */
+.editor.with-dock { padding-bottom: 280px; }
+.dock { max-height: 85dvh; overflow-y: auto; }
+
+/* Ozdobna treść generowana z CSS nie jest czytana (tam, gdzie przeglądarka to obsługuje) */
+.status.pending::before { content: "⏳ " / ""; }
+.status.approved::before { content: "✓ " / ""; }
+.status.rejected::before { content: "✗ " / ""; }
+.feature-list li::before { content: "✓" / ""; }
+
+/* ===== Grupa B: tryb wysokiego kontrastu (B10) ===== */
+@media (forced-colors: active) {
+  input[type="checkbox"] {
+    forced-color-adjust: none;
+    background: Canvas;
+    border: 2px solid ButtonText;
+  }
+  input[type="checkbox"]:checked { background: Highlight; border-color: Highlight; }
+  input[type="checkbox"]:checked::after { color: HighlightText; }
+
+  .num-pin {
+    forced-color-adjust: none;
+    background: Canvas;
+    color: CanvasText;
+    border: 3px solid ButtonText;
+    box-shadow: none;
+  }
+  .num-pin.sel {
+    background: Highlight;
+    color: HighlightText;
+    border-color: ButtonText;
+    outline: 3px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .badge, .chip, .chip-s, .status { border: 1px solid ButtonText; }
+  .badge.near {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: Highlight;
+  }
+
+  .progress, .bar, .rk-bar {
+    forced-color-adjust: none;
+    background: Canvas;
+    border: 1px solid CanvasText;
+  }
+  .progress > div, .bar > span, .rk-bar > span { background: Highlight; }
+
+  .tabs > button[role="tab"][aria-selected="true"] { border-bottom-color: Highlight; }
+  .opt.sel { border-color: Highlight; outline: 2px solid Highlight; }
+  .pw-toggle[aria-pressed="true"] { border: 2px solid Highlight; }
+  .pd-step { border: 2px solid CanvasText; }
 }

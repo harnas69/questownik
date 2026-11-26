@@ -1,4 +1,6 @@
 import PointForm from './PointForm'
+import { plural } from '../lib/plural'
+import type { ValidationError } from '../lib/points'
 import { TASK_LABELS } from '../types/route'
 import type { DraftPoint } from '../types/route'
 
@@ -6,6 +8,7 @@ interface Props {
   point: DraftPoint
   index: number
   total: number
+  errors: ValidationError[]
   open: boolean
   onToggle: () => void
   onChange: (patch: Partial<DraftPoint>) => void
@@ -18,6 +21,7 @@ export default function PointSheet({
   point,
   index,
   total,
+  errors,
   open,
   onToggle,
   onChange,
@@ -26,6 +30,13 @@ export default function PointSheet({
   onDelete,
 }: Props) {
   const text = point.content.prompt.trim()
+  const warn = errors.length > 0 || !text
+  const sub =
+    errors.length > 0
+      ? `${errors.length} ${plural(errors.length, 'błąd', 'błędy', 'błędów')} do poprawy`
+      : open
+        ? 'Dotknij, aby zwinąć'
+        : text || 'Dotknij i uzupełnij treść zadania'
 
   return (
     <section className="sheet" aria-label="Edycja wybranego punktu">
@@ -44,9 +55,7 @@ export default function PointSheet({
             Punkt {index + 1} z {total} · {TASK_LABELS[point.taskType]}
             {point.unlock === 'qr' ? ' · kod QR' : ''}
           </strong>
-          <span className={text ? 'sheet-sub' : 'sheet-sub warn'}>
-            {open ? 'Dotknij, aby zwinąć' : text || 'Dotknij i uzupełnij treść zadania'}
-          </span>
+          <span className={warn ? 'sheet-sub warn' : 'sheet-sub'}>{sub}</span>
         </span>
         <span className="sheet-chevron" aria-hidden="true">
           {open ? '▾' : '▴'}
@@ -56,9 +65,11 @@ export default function PointSheet({
       {open && (
         <div id="sheet-panel" className="sheet-panel">
           <PointForm
+            key={index}
             point={point}
             index={index}
             total={total}
+            errors={errors}
             onChange={onChange}
             onMoveUp={onMoveUp}
             onMoveDown={onMoveDown}

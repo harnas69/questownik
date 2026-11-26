@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom'
 import type { Map as LeafletMap } from 'leaflet'
+import ErrorSummary from '../components/ErrorSummary'
+import FieldError from '../components/FieldError'
 import MapView from '../components/MapView'
 import PointForm from '../components/PointForm'
 import PointList from '../components/PointList'
@@ -13,7 +15,8 @@ import { useConfirm } from '../lib/confirm'
 import { clearDraft, draftKey, fingerprint, loadDraft, saveDraft } from '../lib/draft'
 import type { Draft } from '../lib/draft'
 import { plural } from '../lib/plural'
-import { moveItem, newPoint, validatePoints } from '../lib/points'
+import { errorId, fieldId, moveItem, newPoint, validateRoute } from '../lib/points'
+import type { ValidationError } from '../lib/points'
 import { exportRoute, parseRoute } from '../lib/routeJson'
 import { isForbidden } from '../lib/teacherApi'
 import { useMediaQuery } from '../lib/useMediaQuery'
@@ -80,16 +83,27 @@ function Editor({ uid }: { uid: string }) {
   const [selected, setSelected] = useState<number | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attempted, setAttempted] = useState(false)
   const [saving, setSaving] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [locating, setLocating] = useState(false)
   const [allowManual, setAllowManual] = useState(false)
+  const [, forceRender] = useState(0)
 
   const mapRef = useRef<LeafletMap | null>(null)
   const countRef = useRef(0)
+  const pendingFocus = useRef<{ id: string; until: number } | null>(null)
 
   const storageKey = draftKey(uid, templateId)
   const dirty = fingerprint({ title, points, allowManual }) !== baseline
+
+  // Błędy liczą się na bieżąco, ale dopiero po pierwszej próbie zapisu
+  const errors = useMemo<ValidationError[]>(
+    () => (attempted ? validateRoute(title, points) : []),
+    [attempted, title, points]
+  )
+  const titleError = errors.find((e) => e.field === 'title')
+  const selectedErrors = selected !== null ? errors.filter((e) => e.point === selected) : []
 
   // Najnowsze wartości dla obsługi blokady nawigacji
   const latest = useRef({ storageKey, title, points, allowManual, dirty, draftOffer })
@@ -100,6 +114,20 @@ function Editor({ uid }: { uid: string }) {
   useEffect(() => {
     countRef.current = points.length
   }, [points.length])
+
+  // Fokus na wskazanym polu, gdy tylko pojawi się w drzewie (np. po rozwinięciu panelu punktu)
+  useEffect(() => {
+    const p = pendingFocus.current
+    if (!p) return
+    const el = document.getElementById(p.id)
+    if (el) {
+      pendingFocus.current = null
+      el.focus()
+      el.scrollIntoView({ block: 'center' })
+    } else if (Date.now() > p.until) {
+      pendingFocus.current = null
+    }
+  })
 
   // Wczytanie trasy do edycji
   useEffect(() => {
@@ -178,6 +206,18 @@ function Editor({ uid }: { uid: string }) {
       else reset()
     })
   }, [blocker, askConfirm])
+
+  const goToError = (err: ValidationError) => {
+    if (err.point !== null) {
+      setSelected(err.point)
+      setSheetOpen(true)
+    }
+    pendingFocus.current = {
+      id: fieldId(err.point, err.field, err.option),
+      until: Date.now() + 2000,
+    }
+    forceRender((n) => n + 1)
+  }
 
   const add = (lat: number, lng: number) => {
     setPoints((prev) => [...prev, newPoint(lat, lng)])
@@ -259,6 +299,7 @@ function Editor({ uid }: { uid: string }) {
     setAllowManual(draftOffer.allowManual)
     setSelected(draftOffer.points.length > 0 ? 0 : null)
     setSheetOpen(false)
+    setAttempted(false)
     setError(null)
     setDraftOffer(null)
   }
@@ -280,19 +321,18 @@ function Editor({ uid }: { uid: string }) {
     setAllowManual(false)
     setTemplateId(null)
     setSaved(false)
+    setAttempted(false)
     setError(null)
     setBaseline(EMPTY)
   }
 
+  // Zapis nie jest blokowany przyciskiem: błędne dane dają listę błędów i fokus na pierwszym polu
   const save = async () => {
-    const problem = validatePoints(points)
-    if (problem) {
-      setError(problem)
-      const m = problem.match(/^Punkt (\d+):/)
-      if (m) {
-        setSelected(Number(m[1]) - 1)
-        setSheetOpen(true)
-      }
+    const found = validateRoute(title, points)
+    if (found.length > 0) {
+      setAttempted(true)
+      setError(null)
+      goToError(found[0])
       return
     }
     try {
@@ -302,6 +342,7 @@ function Editor({ uid }: { uid: string }) {
       clearDraft(storageKey) // klucz sprzed zapisu: dla nowej trasy to szkic "new"
       setTemplateId(id)
       setBaseline(fingerprint({ title, points, allowManual }))
+      setAttempted(false)
       setSaved(true)
     } catch (e) {
       console.error(e)
@@ -346,6 +387,7 @@ function Editor({ uid }: { uid: string }) {
       setSelected(0)
       setSheetOpen(false)
       setSaved(false)
+      setAttempted(false)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się wczytać pliku.')
@@ -420,17 +462,16 @@ function Editor({ uid }: { uid: string }) {
     )
   }
 
-  const canSave = title.trim() !== '' && points.length > 0 && !saving
   const saveLabel = saving
     ? 'Zapisuję…'
     : templateId
       ? `Zapisz zmiany (${points.length} pkt)`
       : `Zapisz trasę (${points.length} pkt)`
-  const saveHint = !title.trim()
-    ? 'Wpisz tytuł trasy u góry ekranu.'
-    : points.length === 0
-      ? 'Dodaj co najmniej jeden punkt na mapie.'
-      : null
+
+  const titleAria = {
+    'aria-invalid': titleError ? (true as const) : undefined,
+    'aria-describedby': titleError ? errorId(null, 'title') : undefined,
+  }
 
   const draftBanner = draftOffer ? (
     <div className="banner warn draft-banner" role="region" aria-label="Niezapisany szkic">
@@ -478,16 +519,21 @@ function Editor({ uid }: { uid: string }) {
 
         {draftBanner}
 
-        <input
-          className="answer"
-          aria-label="Tytuł trasy"
-          placeholder="Tytuł trasy"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value)
-            setError(null)
-          }}
-        />
+        <div className="field">
+          <input
+            id="route-title"
+            className="answer"
+            aria-label="Tytuł trasy"
+            placeholder="Tytuł trasy"
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              setError(null)
+            }}
+            {...titleAria}
+          />
+          <FieldError id={errorId(null, 'title')} text={titleError?.text} />
+        </div>
 
         <details className="card more-options">
           <summary>Więcej opcji</summary>
@@ -515,6 +561,7 @@ function Editor({ uid }: { uid: string }) {
         <div className="toolbar-m" role="group" aria-label="Dodawanie i przesuwanie punktów">
           <button
             type="button"
+            id="add-point-btn"
             className="big"
             onClick={addAtCenter}
             aria-label="Dodaj punkt na środku mapy"
@@ -553,6 +600,7 @@ function Editor({ uid }: { uid: string }) {
               point={points[selected]}
               index={selected}
               total={points.length}
+              errors={selectedErrors}
               open={sheetOpen}
               onToggle={() => setSheetOpen((v) => !v)}
               onChange={(patch) => patchPoint(selected, patch)}
@@ -567,8 +615,8 @@ function Editor({ uid }: { uid: string }) {
                 {error}
               </p>
             )}
-            {!error && saveHint && <p className="note">{saveHint}</p>}
-            <button type="button" className="big" disabled={!canSave} onClick={() => void save()}>
+            <ErrorSummary errors={errors} onGo={goToError} compact />
+            <button type="button" className="big" disabled={saving} onClick={() => void save()}>
               {saveLabel}
             </button>
           </div>
@@ -592,6 +640,7 @@ function Editor({ uid }: { uid: string }) {
 
       <div className="row">
         <input
+          id="route-title"
           aria-label="Tytuł trasy"
           placeholder="Tytuł trasy"
           value={title}
@@ -599,8 +648,9 @@ function Editor({ uid }: { uid: string }) {
             setTitle(e.target.value)
             setError(null)
           }}
+          {...titleAria}
         />
-        <button onClick={() => void save()} disabled={!canSave}>
+        <button onClick={() => void save()} disabled={saving}>
           {saveLabel}
         </button>
         <button onClick={onExport} disabled={!title.trim() || points.length === 0}>
@@ -611,6 +661,7 @@ function Editor({ uid }: { uid: string }) {
           <input type="file" accept="application/json,.json" onChange={onImport} />
         </label>
       </div>
+      <FieldError id={errorId(null, 'title')} text={titleError?.text} />
 
       <div className="row">
         <label>
@@ -628,9 +679,10 @@ function Editor({ uid }: { uid: string }) {
           {error}
         </p>
       )}
+      <ErrorSummary errors={errors} onGo={goToError} />
 
       <div className="toolbar" role="group" aria-label="Dodawanie i przesuwanie punktów">
-        <button type="button" onClick={addAtCenter}>
+        <button type="button" id="add-point-btn" onClick={addAtCenter}>
           Dodaj punkt na środku mapy
         </button>
         <button type="button" onClick={addHere} disabled={locating}>
@@ -651,9 +703,11 @@ function Editor({ uid }: { uid: string }) {
           <PointList points={points} selected={selected} onSelect={selectFromList} />
           {selected !== null && points[selected] ? (
             <PointForm
+              key={selected}
               point={points[selected]}
               index={selected}
               total={points.length}
+              errors={selectedErrors}
               onChange={(patch) => patchPoint(selected, patch)}
               onMoveUp={() => move(selected, selected - 1)}
               onMoveDown={() => move(selected, selected + 1)}

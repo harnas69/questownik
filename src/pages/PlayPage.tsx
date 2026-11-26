@@ -1,6 +1,7 @@
-import { Suspense, lazy, useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import ArrivalFeedback from '../components/ArrivalFeedback'
+import ExternalLink from '../components/ExternalLink'
 import FinishScreen from '../components/FinishScreen'
 import FocusHeading from '../components/FocusHeading'
 import ProgressBar from '../components/ProgressBar'
@@ -11,12 +12,14 @@ import { loadRoute } from '../lib/gameApi'
 import { distanceM, isInRange } from '../lib/geo'
 import type { GeoPos } from '../lib/geo'
 import { isNetworkError } from '../lib/network'
+import { playTitle } from '../lib/pageTitle'
 import { plural } from '../lib/plural'
 import { clearProgress, loadProgress, saveProgress } from '../lib/progress'
 import { PROXIMITY_LABEL, proximity } from '../lib/proximity'
 import { extractToken } from '../lib/qr'
 import { createSession, fetchSessionState, isGameClosed } from '../lib/sessionApi'
 import { forgetUnlocked, isUnlockedLocal, markUnlocked } from '../lib/unlockStore'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 import { useOnline } from '../lib/useOnline'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
@@ -42,6 +45,7 @@ export default function PlayPage() {
   const [route, setRoute] = useState<GameRoute | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [team, setTeam] = useState('')
+  const [teamError, setTeamError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [state, setState] = useState<SessionState | null>(null)
   const [stale, setStale] = useState(false) // pokazujemy ostatni znany stan, bez potwierdzenia z serwera
@@ -56,12 +60,24 @@ export default function PlayPage() {
   const [pendingToken, setPendingToken] = useState<string | null>(() =>
     extractToken(window.location.hash)
   )
+  const teamRef = useRef<HTMLInputElement>(null)
 
   const online = useOnline()
   const started = sessionId !== null && state !== null
   const routeCode = route?.code
 
   useWakeLock(started)
+
+  // Tytuł karty zmienia się wraz z postępem gry: start, zadanie N z M, koniec
+  useDocumentTitle(
+    playTitle({
+      error: loadError !== null,
+      routeTitle: route?.title ?? null,
+      started,
+      index: state?.currentIdx ?? 0,
+      total: route?.points.length ?? 0,
+    })
+  )
 
   // Kod nie powinien zostawać w pasku adresu ani w historii przeglądarki
   useEffect(() => {
@@ -185,6 +201,7 @@ export default function PlayPage() {
   if (loadError) {
     return (
       <main className="play">
+        <h1 className="sr-only">Błąd wczytywania gry</h1>
         <p role="alert" className="bad">
           {loadError}
         </p>
@@ -199,6 +216,7 @@ export default function PlayPage() {
   if (route.points.length === 0) {
     return (
       <main className="play">
+        <h1>{route.title}</h1>
         <p>Ta trasa nie ma punktów.</p>
         <Link to="/">Wróć</Link>
       </main>
@@ -230,6 +248,19 @@ export default function PlayPage() {
       }
     }
 
+    // Przycisk jest wyłączony tylko na czas żądania. Pusta nazwa daje komunikat i fokus na polu.
+    const onSubmit = (e: React.FormEvent) => {
+      e.preventDefault()
+      if (starting) return
+      if (!team.trim()) {
+        setTeamError('Wpisz nazwę drużyny.')
+        teamRef.current?.focus()
+        return
+      }
+      setTeamError(null)
+      void start()
+    }
+
     const n = route.points.length
     return (
       <main className="play">
@@ -240,32 +271,43 @@ export default function PlayPage() {
             lokalizacji.
           </p>
         </div>
-        <form
-          className="card"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (team.trim() && !starting) void start()
-          }}
-        >
+        <form className="card" onSubmit={onSubmit} noValidate>
           <label htmlFor="team" className="field-label">
             Nazwa drużyny
           </label>
           <input
             id="team"
+            ref={teamRef}
             className="answer"
             placeholder="np. Szybcy Kaliszanie"
             maxLength={30}
             autoComplete="off"
             value={team}
-            onChange={(e) => setTeam(e.target.value)}
+            aria-invalid={teamError ? true : undefined}
+            aria-describedby={
+              ['team-note', teamError && 'team-error', startError && 'team-start-error']
+                .filter(Boolean)
+                .join(' ')
+            }
+            onChange={(e) => {
+              setTeam(e.target.value)
+              setTeamError(null)
+            }}
           />
-          <p className="note">Nie podawaj imion i nazwisk, wystarczy nazwa drużyny.</p>
+          <p id="team-note" className="note">
+            Nie podawaj imion i nazwisk, wystarczy nazwa drużyny.
+          </p>
+          {teamError && (
+            <p id="team-error" role="alert" className="bad">
+              {teamError}
+            </p>
+          )}
           {startError && (
-            <p role="alert" className="bad">
+            <p id="team-start-error" role="alert" className="bad">
               {startError}
             </p>
           )}
-          <button type="submit" className="big" disabled={!team.trim() || starting}>
+          <button type="submit" className="big" disabled={starting}>
             {starting ? 'Startuję…' : 'Start'}
           </button>
         </form>
@@ -299,6 +341,9 @@ export default function PlayPage() {
   const inRange = isQr ? qrOpen : unlocked || (pos !== null && isInRange(pos, point))
   const prox = dist !== null ? proximity(dist, point.radiusM) : null
   const shown = dist !== null ? fmtDist(dist) : null
+  // Region live istnieje zawsze (pusty), a zmienia się tylko jego tekst. Czytnik ogłasza
+  // wyłącznie zmianę kategorii odległości, a nie każdy metr.
+  const liveDistance = !isQr && !inRange && prox ? PROXIMITY_LABEL[prox] : ''
 
   // Tryb awaryjny (włącza nauczyciel): przycisk tylko gdy GPS zawodzi albo jesteś blisko
   const manualAllowed =
@@ -338,6 +383,10 @@ export default function PlayPage() {
       </header>
 
       <ProgressBar done={state.currentIdx} total={route.points.length} />
+
+      <p className="sr-only" aria-live="polite">
+        {liveDistance}
+      </p>
 
       {stale && (
         <p role="status" className="banner warn">
@@ -427,10 +476,6 @@ export default function PlayPage() {
               <span className={prox === 'veryNear' || prox === 'here' ? 'badge near' : 'badge'}>
                 {PROXIMITY_LABEL[prox]}
               </span>
-              {/* Czytnik ekranu ogłasza tylko zmianę kategorii, a nie każdy metr */}
-              <p className="sr-only" aria-live="polite">
-                {PROXIMITY_LABEL[prox]}
-              </p>
             </div>
           )}
 
@@ -461,14 +506,12 @@ export default function PlayPage() {
               [debug] Symuluj dojście
             </button>
           )}
-          <a
+          <ExternalLink
             className="big secondary"
             href={`https://www.google.com/maps/dir/?api=1&destination=${point.lat},${point.lng}&travelmode=walking`}
-            target="_blank"
-            rel="noreferrer"
           >
             Otwórz w Mapach Google
-          </a>
+          </ExternalLink>
         </section>
       )}
     </main>

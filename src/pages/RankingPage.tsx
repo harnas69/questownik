@@ -9,6 +9,8 @@ import { durationMs, sortRanking, splitPodium } from '../lib/ranking'
 import type { SessionRow } from '../lib/ranking'
 import { fetchSessions, loadRouteInfo, subscribeSessions } from '../lib/sessionApi'
 import type { RouteInfo } from '../lib/sessionApi'
+import { rankingTitle } from '../lib/pageTitle'
+import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 interface RowProps {
   place: number
@@ -57,7 +59,7 @@ export default function RankingPage() {
 
   // Sesja z tego urządzenia (jeśli ktoś grał w tej przeglądarce)
   const mineId = loadProgress(code.toUpperCase())?.sessionId ?? null
-
+  useDocumentTitle(rankingTitle(info?.title))
   useEffect(() => {
     let cancelled = false
     let unsubscribe: () => void = () => {}

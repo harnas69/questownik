@@ -80,12 +80,16 @@ export default function FinishScreen({
     : null
   const pct = totalPoints > 0 ? Math.min(100, Math.round((state.score / totalPoints) * 100)) : 0
 
-  let placeLine: string | null = null
+  let placeMedal: string | null = null
+  let placeText: string | null = null
   if (place && place.total >= 2 && place.place <= 3) {
-    placeLine =
+    placeMedal = MEDAL[place.place - 1]
+    placeText =
       place.place === 1
-        ? `${MEDAL[0]} ${place.unfinished ? 'Prowadzicie!' : 'Wygraliście!'}`
-        : `${MEDAL[place.place - 1]} Miejsce ${place.place}!`
+        ? place.unfinished
+          ? 'Prowadzicie!'
+          : 'Wygraliście!'
+        : `Miejsce ${place.place}!`
   }
 
   return (
@@ -97,8 +101,12 @@ export default function FinishScreen({
         </span>
         <FocusHeading>Koniec trasy!</FocusHeading>
         <p className="lead">{headline(pct, hasPhoto)}</p>
-        {placeLine && <p className="place-line">{placeLine}</p>}
-        <p>
+        {placeText && (
+          <p className="place-line">
+            <span aria-hidden="true">{placeMedal} </span>
+            {placeText}
+          </p>
+        )}        <p>
           Drużyna: <strong>{team}</strong>
         </p>
         <p className="big-score">

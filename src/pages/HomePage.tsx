@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { extractGameCode } from '../lib/gameCode'
@@ -34,13 +34,21 @@ function RouteArt() {
 export default function HomePage() {
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const navigate = useNavigate()
 
+  // Przycisk jest zawsze aktywny: puste lub błędne pole daje komunikat i fokus na polu
   const submit = (e: FormEvent) => {
     e.preventDefault()
+    if (!value.trim()) {
+      setError('Wpisz kod gry, który dostałeś od nauczyciela.')
+      inputRef.current?.focus()
+      return
+    }
     const code = extractGameCode(value)
     if (!code) {
       setError('Kod gry ma 6 znaków (cyfry i litery). Sprawdź, czy dobrze go przepisałeś.')
+      inputRef.current?.focus()
       return
     }
     navigate(`/gra/${code}`)
@@ -56,12 +64,13 @@ export default function HomePage() {
         </p>
       </div>
 
-      <form className="card join-card" onSubmit={submit}>
+      <form className="card join-card" onSubmit={submit} noValidate>
         <label htmlFor="game-code" className="field-label">
           Kod gry
         </label>
         <input
           id="game-code"
+          ref={inputRef}
           className="answer code-input"
           placeholder="np. 74C2TF"
           value={value}
@@ -81,7 +90,7 @@ export default function HomePage() {
             {error}
           </p>
         )}
-        <button type="submit" className="big" disabled={!value.trim()}>
+        <button type="submit" className="big">
           Dołącz do gry
         </button>
       </form>
@@ -104,12 +113,16 @@ export default function HomePage() {
         </ul>
         <div className="cta-grid">
           <Link className="card cta-card" to="/biblioteka">
-            <span className="cta-icon" aria-hidden="true">📚</span>
+            <span className="cta-icon" aria-hidden="true">
+              📚
+            </span>
             <strong>Biblioteka tras</strong>
             <span>Gotowe trasy innych nauczycieli: uruchom z nich grę lub skopiuj do siebie.</span>
           </Link>
           <Link className="card cta-card" to="/konto">
-            <span className="cta-icon" aria-hidden="true">🗺️</span>
+            <span className="cta-icon" aria-hidden="true">
+              🗺️
+            </span>
             <strong>Moje konto</strong>
             <span>Utwórz własną trasę, uruchom grę z klasą i oglądaj wyniki na żywo.</span>
           </Link>

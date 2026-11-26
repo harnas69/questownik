@@ -1,31 +1,45 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { passwordErrorMessage, updatePassword, useAuth } from '../lib/auth'
+import PasswordField from '../components/PasswordField'
 import { PageSkeleton } from '../components/Skeleton'
+import { passwordErrorMessage, updatePassword, useAuth } from '../lib/auth'
 
 export default function ResetPasswordPage() {
   const { user, loading } = useAuth()
   const [pw, setPw] = useState('')
   const [pw2, setPw2] = useState('')
+  const [err1, setErr1] = useState<string | null>(null)
+  const [err2, setErr2] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const ref1 = useRef<HTMLInputElement>(null)
+  const ref2 = useRef<HTMLInputElement>(null)
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    if (pw !== pw2) {
-      setError('Hasła nie są takie same.')
+    if (busy) return
+    setFormError(null)
+    const p1 = pw === '' ? 'Wpisz nowe hasło.' : pw.length < 8 ? 'Hasło musi mieć co najmniej 8 znaków.' : null
+    const p2 = p1 ? null : pw2 === '' ? 'Powtórz nowe hasło.' : pw !== pw2 ? 'Hasła nie są takie same.' : null
+    setErr1(p1)
+    setErr2(p2)
+    if (p1) {
+      ref1.current?.focus()
+      return
+    }
+    if (p2) {
+      ref2.current?.focus()
       return
     }
     setBusy(true)
-    setError(null)
     try {
       await updatePassword(pw)
       setDone(true)
-    } catch (err) {
-      console.error(err)
-      setError(passwordErrorMessage(err))
+    } catch (error) {
+      console.error(error)
+      setFormError(passwordErrorMessage(error))
     } finally {
       setBusy(false)
     }
@@ -60,40 +74,46 @@ export default function ResetPasswordPage() {
     )
   }
 
+  const formErrId = formError ? 'reset-form-error' : undefined
+
   return (
     <main className="play">
       <h1>Ustaw nowe hasło</h1>
-      <form className="card auth-form" onSubmit={submit}>
-        <label htmlFor="new-pass" className="field-label">
-          Nowe hasło (minimum 8 znaków)
-        </label>
-        <input
+      <form className="card auth-form" onSubmit={(e) => void submit(e)} noValidate>
+        <PasswordField
           id="new-pass"
-          className="answer"
-          type="password"
-          minLength={8}
-          autoComplete="new-password"
+          label="Nowe hasło (minimum 8 znaków)"
           value={pw}
-          onChange={(e) => setPw(e.target.value)}
-        />
-        <label htmlFor="new-pass2" className="field-label">
-          Powtórz nowe hasło
-        </label>
-        <input
-          id="new-pass2"
-          className="answer"
-          type="password"
-          minLength={8}
+          onChange={(v) => {
+            setPw(v)
+            setErr1(null)
+          }}
           autoComplete="new-password"
-          value={pw2}
-          onChange={(e) => setPw2(e.target.value)}
+          error={err1}
+          describedBy={formErrId}
+          toggleHint="nowe"
+          inputRef={ref1}
         />
-        {error && (
-          <p role="alert" className="bad">
-            {error}
+        <PasswordField
+          id="new-pass2"
+          label="Powtórz nowe hasło"
+          value={pw2}
+          onChange={(v) => {
+            setPw2(v)
+            setErr2(null)
+          }}
+          autoComplete="new-password"
+          error={err2}
+          describedBy={formErrId}
+          toggleHint="powtórzone"
+          inputRef={ref2}
+        />
+        {formError && (
+          <p id="reset-form-error" role="alert" className="bad">
+            {formError}
           </p>
         )}
-        <button type="submit" className="big" disabled={busy || pw.length < 8 || pw2.length < 8}>
+        <button type="submit" className="big" disabled={busy}>
           {busy ? 'Zapisuję…' : 'Zapisz nowe hasło'}
         </button>
       </form>

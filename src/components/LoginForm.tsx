@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import PasswordField from './PasswordField'
 import {
   authErrorMessage,
   requestPasswordReset,
@@ -17,35 +18,72 @@ const TITLES: Record<Mode, string> = {
   reset: 'Odzyskaj hasło',
 }
 
+const EMAIL_RE = /^\S+@\S+\.\S+$/
+
 export default function LoginForm() {
   const [mode, setMode] = useState<Mode>('in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [formError, setFormError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+  const [passError, setPassError] = useState<string | null>(null)
+  const emailRef = useRef<HTMLInputElement>(null)
+  const passRef = useRef<HTMLInputElement>(null)
+
+  const formErrId = formError ? 'auth-form-error' : undefined
 
   const switchMode = (m: Mode) => {
     setMode(m)
-    setError(null)
+    setFormError(null)
     setInfo(null)
+    setEmailError(null)
+    setPassError(null)
   }
 
   const google = async () => {
-    setError(null)
+    setFormError(null)
     try {
       await signInWithGoogle()
     } catch (e) {
       console.error(e)
-      setError(authErrorMessage(e))
+      setFormError(authErrorMessage(e))
     }
   }
 
+  // Przycisk jest wyłączony tylko na czas żądania. Błędne dane dają komunikat i fokus na polu.
   const submit = async (e: FormEvent) => {
     e.preventDefault()
-    setBusy(true)
-    setError(null)
+    if (busy) return
+    setFormError(null)
     setInfo(null)
+
+    const eMsg = !email.trim()
+      ? 'Wpisz adres e-mail.'
+      : !EMAIL_RE.test(email.trim())
+        ? 'Wpisz poprawny adres e-mail, np. nazwa@szkola.pl.'
+        : null
+    const pMsg =
+      mode === 'reset'
+        ? null
+        : password === ''
+          ? 'Wpisz hasło.'
+          : mode === 'up' && password.length < 8
+            ? 'Hasło musi mieć co najmniej 8 znaków.'
+            : null
+    setEmailError(eMsg)
+    setPassError(pMsg)
+    if (eMsg) {
+      emailRef.current?.focus()
+      return
+    }
+    if (pMsg) {
+      passRef.current?.focus()
+      return
+    }
+
+    setBusy(true)
     try {
       if (mode === 'in') {
         await signInWithEmail(email, password)
@@ -64,7 +102,7 @@ export default function LoginForm() {
       }
     } catch (err) {
       console.error(err)
-      setError(authErrorMessage(err))
+      setFormError(authErrorMessage(err))
     } finally {
       setBusy(false)
     }
@@ -83,39 +121,51 @@ export default function LoginForm() {
         </>
       )}
 
-      <form className="auth-form" onSubmit={submit}>
-        <label htmlFor="auth-email" className="field-label">
-          Adres e-mail
-        </label>
-        <input
-          id="auth-email"
-          className="answer"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
+      <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>
+        <div className="field">
+          <label htmlFor="auth-email" className="field-label">
+            Adres e-mail
+          </label>
+          <input
+            id="auth-email"
+            ref={emailRef}
+            className="answer"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              setEmailError(null)
+            }}
+            aria-invalid={emailError ? true : undefined}
+            aria-describedby={[emailError && 'auth-email-error', formErrId].filter(Boolean).join(' ') || undefined}
+          />
+          {emailError && (
+            <p id="auth-email-error" role="alert" className="bad field-error">
+              {emailError}
+            </p>
+          )}
+        </div>
 
         {mode !== 'reset' && (
-          <>
-            <label htmlFor="auth-pass" className="field-label">
-              Hasło (minimum 8 znaków)
-            </label>
-            <input
-              id="auth-pass"
-              className="answer"
-              type="password"
-              minLength={8}
-              autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </>
+          <PasswordField
+            id="auth-pass"
+            label={mode === 'up' ? 'Hasło (minimum 8 znaków)' : 'Hasło'}
+            value={password}
+            onChange={(v) => {
+              setPassword(v)
+              setPassError(null)
+            }}
+            autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
+            error={passError}
+            describedBy={formErrId}
+            inputRef={passRef}
+          />
         )}
 
-        {error && (
-          <p role="alert" className="bad">
-            {error}
+        {formError && (
+          <p id="auth-form-error" role="alert" className="bad">
+            {formError}
           </p>
         )}
         {info && <p role="status">{info}</p>}
@@ -133,11 +183,7 @@ export default function LoginForm() {
           </p>
         )}
 
-        <button
-          type="submit"
-          className="big"
-          disabled={busy || !email.trim() || (mode !== 'reset' && password.length < 8)}
-        >
+        <button type="submit" className="big" disabled={busy}>
           {busy
             ? 'Chwileczkę…'
             : mode === 'in'
@@ -156,7 +202,7 @@ export default function LoginForm() {
       <button
         type="button"
         className="link-button"
-        onClick={() => switchMode(mode === 'up' ? 'in' : mode === 'in' ? 'up' : 'in')}
+        onClick={() => switchMode(mode === 'in' ? 'up' : 'in')}
       >
         {mode === 'in'
           ? 'Nie masz konta? Załóż je'

@@ -18,7 +18,7 @@ interface Props {
 
 const targetIcon = L.divIcon({
   className: 'pin',
-  html: '📍',
+  html: '<span aria-hidden="true">📍</span>',
   iconSize: [32, 32],
   iconAnchor: [16, 30],
 })
