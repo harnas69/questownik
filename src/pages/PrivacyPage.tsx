@@ -80,6 +80,11 @@ export default function PrivacyPage() {
             <strong>Konto możesz usunąć sam</strong> w zakładce „Moje konto”. Usuwa to Twoje trasy,
             gry (wraz z wynikami i zdjęciami) i samo konto.
           </li>
+          <li>
+            Edytor tras zapisuje szkic niezapisanej trasy (razem z poprawnymi odpowiedziami) w
+            pamięci przeglądarki na Twoim urządzeniu. Szkic jest przypisany do Twojego konta i
+            znika po zapisaniu trasy albo jego odrzuceniu.
+          </li>
         </ul>
       </section>
 
