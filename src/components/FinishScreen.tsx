@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import FocusHeading from './FocusHeading'
+import { useConfirm } from '../lib/confirm'
 import { fmtClock } from '../lib/format'
 import { clearProgress } from '../lib/progress'
 import { sortRanking } from '../lib/ranking'
@@ -45,6 +46,7 @@ export default function FinishScreen({
   sessionId,
   hasPhoto,
 }: Props) {
+  const askConfirm = useConfirm()
   const [place, setPlace] = useState<Place | null>(null)
 
   useEffect(() => {
@@ -74,6 +76,19 @@ export default function FinishScreen({
       window.clearInterval(timer)
     }
   }, [routeId, sessionId])
+
+  const playAgain = async () => {
+    const ok = await askConfirm({
+      title: 'Zagrać od nowa?',
+      message:
+        'Zaczniesz trasę od początku jako nowa drużyna. Wynik tej drużyny zostaje w rankingu, ale na tym urządzeniu nie wrócisz już do tego ekranu z podsumowaniem.',
+      confirmLabel: 'Zagraj od nowa',
+      cancelLabel: 'Zostań tutaj',
+    })
+    if (!ok) return
+    clearProgress(routeCode)
+    window.location.reload()
+  }
 
   const duration = state.finishedAt
     ? Date.parse(state.finishedAt) - Date.parse(state.startedAt)
@@ -106,7 +121,8 @@ export default function FinishScreen({
             <span aria-hidden="true">{placeMedal} </span>
             {placeText}
           </p>
-        )}        <p>
+        )}
+        <p>
           Drużyna: <strong>{team}</strong>
         </p>
         <p className="big-score">
@@ -144,14 +160,7 @@ export default function FinishScreen({
       <Link className="big" to={`/ranking/${routeCode}`}>
         Zobacz ranking
       </Link>
-      <button
-        type="button"
-        className="big secondary"
-        onClick={() => {
-          clearProgress(routeCode)
-          window.location.reload()
-        }}
-      >
+      <button type="button" className="big secondary" onClick={() => void playAgain()}>
         Zagraj od nowa
       </button>
       <Link to="/">Strona główna</Link>

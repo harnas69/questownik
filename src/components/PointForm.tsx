@@ -15,6 +15,7 @@ import {
   removeOption,
 } from '../lib/points'
 import type { ErrorField, ValidationError } from '../lib/points'
+import CoordFields from './CoordFields'
 
 interface Props {
   point: DraftPoint
@@ -309,7 +310,7 @@ export default function PointForm({
           szukać kodu.
         </p>
       )}
-
+      <CoordFields index={index} lat={point.lat} lng={point.lng} onChange={onChange} />
       <div className="field">
         <label htmlFor={fieldId(index, 'score')} className="field-label">
           Punkty do zdobycia

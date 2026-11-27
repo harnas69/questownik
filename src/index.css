@@ -1018,3 +1018,27 @@ input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="
   .pw-toggle[aria-pressed="true"] { border: 2px solid Highlight; }
   .pd-step { border: 2px solid CanvasText; }
 }
+
+/* ===== Grupa C: wyszukiwarka adresów, współrzędne ===== */
+.map-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+.place-search { display: flex; flex-direction: column; gap: 8px; }
+details.place-search { padding: 0 16px; gap: 0; }
+details.place-search > summary {
+  min-height: 48px; display: flex; align-items: center; cursor: pointer; font-weight: 600;
+}
+details.place-search[open] { padding-bottom: 16px; }
+.place-form { display: flex; flex-direction: column; gap: 6px; }
+.place-row { display: flex; gap: 8px; }
+.place-row input { flex: 1 1 0; min-width: 0; }
+.place-results {
+  list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.place-item {
+  display: flex; flex-direction: column; gap: 6px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface);
+}
+.place-label { overflow-wrap: anywhere; }
+
+.coords { display: flex; flex-direction: column; gap: 8px; }

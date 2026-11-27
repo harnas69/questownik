@@ -1,10 +1,8 @@
-const CONTROLLER =
-  '[Antoni Markowski]'
-const CONTACT = '[antekman2@gmail.com]'
-const REGION = '[West EU (Ireland)]'
+const CONTROLLER = 'Antoni Markowski'
+const CONTACT = 'antekman2@gmail.com'
+const REGION = 'West EU (Ireland)'
 
-const incomplete = [CONTROLLER, CONTACT, REGION].some((s) => s.startsWith('[UZUPEŁNIJ'))
-
+const incomplete = [CONTROLLER, CONTACT, REGION].some((s) => s.includes('UZUPEŁNIJ'))
 export default function PrivacyPage() {
   return (
     <main className="teacher privacy">
@@ -97,6 +95,10 @@ export default function PrivacyPage() {
           <li>
             OpenStreetMap: kafelki mapy. Przeglądarka łączy się bezpośrednio z serwerami
             OpenStreetMap, które widzą adres IP użytkownika.
+          </li>
+          <li>
+            Nominatim (OpenStreetMap): wyszukiwarka adresów w edytorze tras (tylko dla
+            nauczycieli). Wpisane zapytanie i adres IP trafiają do serwerów OpenStreetMap.
           </li>
         </ul>
       </section>

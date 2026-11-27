@@ -24,6 +24,30 @@ import { useOnline } from '../lib/useOnline'
 import { useWakeLock } from '../lib/useWakeLock'
 import type { AnswerResult, GameRoute, SessionState } from '../types/game'
 
+function LoadFailure({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null)
+
+  // Fokus na nagłówku błędu: po każdej nieudanej próbie czytnik ekranu go odczyta
+  useEffect(() => {
+    heading.current?.focus()
+  }, [])
+
+  return (
+    <main className="play">
+      <h1 ref={heading} tabIndex={-1}>
+        Nie udało się wczytać gry
+      </h1>
+      <p role="alert" className="bad">
+        {message}
+      </p>
+      <button type="button" className="big" onClick={onRetry}>
+        Spróbuj ponownie
+      </button>
+      <Link to="/">Wróć na stronę główną</Link>
+    </main>
+  )
+}
+
 const PlayMap = lazy(() => import('../components/PlayMap'))
 
 const MSG_NO_SNAPSHOT =
@@ -44,6 +68,7 @@ export default function PlayPage() {
 
   const [route, setRoute] = useState<GameRoute | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [team, setTeam] = useState('')
   const [teamError, setTeamError] = useState<string | null>(null)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -135,8 +160,8 @@ export default function PlayPage() {
     return () => {
       cancelled = true
     }
-  }, [code])
-
+  }, [code, attempt])
+  
   // 2. Zapamiętuj ostatni znany stan sesji (nie nadpisuj go, dopóki pokazujemy stary)
   useEffect(() => {
     if (!routeCode || !sessionId || !state || stale) return
@@ -200,16 +225,13 @@ export default function PlayPage() {
 
   if (loadError) {
     return (
-      <main className="play">
-        <h1 className="sr-only">Błąd wczytywania gry</h1>
-        <p role="alert" className="bad">
-          {loadError}
-        </p>
-        <button type="button" onClick={() => window.location.reload()}>
-          Odśwież stronę
-        </button>
-        <Link to="/">Wróć na stronę główną</Link>
-      </main>
+      <LoadFailure
+        message={loadError}
+        onRetry={() => {
+          setLoadError(null)
+          setAttempt((n) => n + 1)
+        }}
+      />
     )
   }
   if (!route) return <PageSkeleton label="Wczytuję trasę…" />

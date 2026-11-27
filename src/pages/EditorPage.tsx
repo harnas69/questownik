@@ -21,6 +21,7 @@ import { exportRoute, parseRoute } from '../lib/routeJson'
 import { isForbidden } from '../lib/teacherApi'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import type { DraftPoint } from '../types/route'
+import PlaceSearch from '../components/PlaceSearch'
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const EMPTY = fingerprint({ title: '', points: [], allowManual: false })
@@ -490,18 +491,44 @@ function Editor({ uid }: { uid: string }) {
     </div>
   ) : null
 
+  const showOnMap = (lat: number, lng: number) => {
+    const map = mapRef.current
+    if (map) map.setView([lat, lng], Math.max(map.getZoom(), 17))
+  }
+
+  const addFromSearch = (lat: number, lng: number) => {
+    add(lat, lng)
+    showOnMap(lat, lng)
+  }
+
+  // Widoczny fragment mapy to podpowiedź dla wyszukiwarki (wyniki stąd są wyżej)
+  const searchBias = () => {
+    const b = mapRef.current?.getBounds()
+    return b
+      ? { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }
+      : undefined
+  }
+
   const mapEl = (
-    <div className="map-holder">
-      <MapView
-        points={points}
-        selected={selected}
-        mapRef={mapRef}
-        onAdd={add}
-        clickToAdd={!isMobile}
-        onSelect={selectFromMap}
-        onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
+    <div className="map-col">
+      <PlaceSearch
+        compact={isMobile}
+        getBias={searchBias}
+        onShow={showOnMap}
+        onAdd={addFromSearch}
       />
-      <div className="crosshair" aria-hidden="true" />
+      <div className="map-holder">
+        <MapView
+          points={points}
+          selected={selected}
+          mapRef={mapRef}
+          onAdd={add}
+          clickToAdd={!isMobile}
+          onSelect={selectFromMap}
+          onMove={(i, lat, lng) => patchPoint(i, { lat, lng })}
+        />
+        <div className="crosshair" aria-hidden="true" />
+      </div>
     </div>
   )
 

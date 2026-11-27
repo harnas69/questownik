@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { Circle, CircleMarker, MapContainer, Marker, Polyline, TileLayer, useMap } from 'react-leaflet'
+import {
+  Circle,
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Polyline,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { GeoPos } from '../lib/geo'
@@ -23,15 +32,48 @@ const targetIcon = L.divIcon({
   iconAnchor: [16, 30],
 })
 
-// Dopasowuje widok do celu i gracza: przy zmianie celu, po kliknięciu przycisku
-// oraz gdy gracz wyjdzie poza widoczny fragment mapy.
-function AutoFit({ target, pos, signal }: { target: Target; pos: GeoPos | null; signal: number }) {
+// Dopasowuje widok do celu i gracza: przy zmianie celu, po kliknięciu przycisku oraz gdy gracz
+// wyjdzie poza widoczny fragment. Ręczne przesunięcie lub zmiana zbliżenia wstrzymuje
+// dopasowywanie do czasu kliknięcia „Pokaż mnie i cel”.
+function AutoFit({
+  target,
+  pos,
+  signal,
+  onManual,
+}: {
+  target: Target
+  pos: GeoPos | null
+  signal: number
+  onManual: () => void
+}) {
   const map = useMap()
   const lastKey = useRef('')
+  const lastSignal = useRef(signal)
+  const paused = useRef(false)
+  const programmatic = useRef(false)
+  const onManualRef = useRef(onManual)
   const plat = pos?.lat
   const plng = pos?.lng
 
   useEffect(() => {
+    onManualRef.current = onManual
+  })
+
+  // Zdarzenia wywołane przez nasze własne fitBounds nie liczą się jako ruch użytkownika
+  const userMoved = () => {
+    if (programmatic.current || paused.current) return
+    paused.current = true
+    onManualRef.current()
+  }
+  useMapEvents({ dragstart: userMoved, movestart: userMoved, zoomstart: userMoved })
+
+  useEffect(() => {
+    if (signal !== lastSignal.current) {
+      lastSignal.current = signal
+      paused.current = false // kliknięto „Pokaż mnie i cel”
+    }
+    if (paused.current) return
+
     const points: L.LatLngTuple[] = [[target.lat, target.lng]]
     let outside = false
     if (plat !== undefined && plng !== undefined) {
@@ -39,9 +81,14 @@ function AutoFit({ target, pos, signal }: { target: Target; pos: GeoPos | null; 
       outside = !map.getBounds().contains([plat, plng])
     }
     const key = `${target.lat},${target.lng},${plat !== undefined},${signal}`
-    if (key !== lastKey.current || outside) {
-      lastKey.current = key
+    if (key === lastKey.current && !outside) return
+    lastKey.current = key
+
+    programmatic.current = true
+    try {
       map.fitBounds(L.latLngBounds(points), { padding: [40, 40], maxZoom: 18, animate: false })
+    } finally {
+      programmatic.current = false
     }
   }, [map, target.lat, target.lng, plat, plng, signal])
 
@@ -50,13 +97,19 @@ function AutoFit({ target, pos, signal }: { target: Target; pos: GeoPos | null; 
 
 export default function PlayMap({ target, pos }: Props) {
   const [signal, setSignal] = useState(0)
+  const [manual, setManual] = useState(false)
 
   return (
     <div className="map-block">
       <div className="map-wrap" role="region" aria-label="Mapa z Twoją pozycją i celem">
         <MapContainer center={[target.lat, target.lng]} zoom={17}>
           <TileLayer crossOrigin attribution={TILE_ATTRIBUTION} url={TILE_URL} />
-          <AutoFit target={target} pos={pos} signal={signal} />
+          <AutoFit
+            target={target}
+            pos={pos}
+            signal={signal}
+            onManual={() => setManual(true)}
+          />
 
           <Circle
             center={[target.lat, target.lng]}
@@ -99,9 +152,21 @@ export default function PlayMap({ target, pos }: Props) {
           )}
         </MapContainer>
       </div>
-      <button type="button" onClick={() => setSignal((s) => s + 1)}>
+      <button
+        type="button"
+        className={manual ? 'primary' : undefined}
+        onClick={() => {
+          setManual(false)
+          setSignal((s) => s + 1)
+        }}
+      >
         Pokaż mnie i cel
       </button>
+      <p role="status" className={manual ? 'note' : 'sr-only'}>
+        {manual
+          ? 'Mapa jest ustawiona ręcznie i nie podąża za Twoją pozycją. Użyj przycisku „Pokaż mnie i cel”, aby wrócić do widoku z celem.'
+          : ''}
+      </p>
     </div>
   )
 }
